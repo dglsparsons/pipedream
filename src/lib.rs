@@ -1,7 +1,10 @@
 use cfg_if::cfg_if;
 pub mod app;
+#[cfg(feature = "ssr")]
+mod aws;
 pub mod error_template;
 pub mod fileserv;
+mod workflow;
 
 cfg_if! { if #[cfg(feature = "hydrate")] {
     use leptos::*;

@@ -1,15 +1,21 @@
-use crate::error_template::{AppError, ErrorTemplate};
+#![allow(clippy::too_many_arguments)]
+use super::workflow;
+use crate::{
+    error_template::{AppError, ErrorTemplate},
+    workflow::{Wave, Workflow},
+};
+use chrono::{DateTime, Local};
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use serde::{Deserialize, Serialize};
 
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
     view! {
-        <Stylesheet id="leptos" href="/pkg/tailwind.css"/>
         <Stylesheet id="leptos" href="/pkg/pipedream.css"/>
-        <Title text="Welcome to Leptos"/>
+        <Title text="Pipedream"/>
         <Router fallback=|| {
             let mut outside_errors = Errors::default();
             outside_errors.insert_with_default_key(AppError::NotFound);
@@ -27,27 +33,171 @@ pub fn App() -> impl IntoView {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Response {
+    url: String,
+}
+
+#[server(CreateWorkflow, "/api", "Url", "workflow")]
+pub async fn create_workflow(
+    github_token: String,
+    git_ref: String,
+    repo: String,
+    owner: String,
+    sha: String,
+    stability_period_minutes: usize,
+    waves: String,
+    workflow: String,
+    commit_message: String,
+) -> Result<Response, ServerFnError> {
+    let waves = waves
+        .split(',')
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+    workflow::client()
+        .await
+        .create(workflow::CreateWorkflowRequest {
+            github_token,
+            git_ref,
+            repo: repo.clone(),
+            owner: owner.clone(),
+            sha: sha.clone(),
+            stability_period_minutes,
+            waves,
+            workflow,
+            commit_message,
+        })
+        .await
+        .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+
+    Ok(Response {
+        url: format!("https://pipedream.fly.dev/{}/{}/{}", owner, repo, sha),
+    })
+}
+
+#[server(ListWorkflows)]
+pub async fn list_workflows(
+    owner: String,
+    repo: String,
+) -> Result<Vec<workflow::Workflow>, ServerFnError> {
+    match workflow::client().await.list(owner, repo).await {
+        Err(e) => {
+            logging::error!("failed to list workflows: {:#}", e);
+            Err(ServerFnError::ServerError(
+                "unable to list workflows".to_string(),
+            ))
+        }
+        Ok(v) => Ok(v),
+    }
+}
+
 #[component]
 fn HomePage() -> impl IntoView {
-    // Creates a reactive value to update the button
-    let (count, set_count) = create_signal(0);
-
     view! {
-        <Title text="Leptos + Tailwindcss"/>
-        <main>
-            <div class="bg-gradient-to-tl from-blue-800 to-blue-500 text-white font-mono flex flex-col min-h-screen">
-                <div class="flex flex-row-reverse flex-wrap m-auto">
-                    <button on:click=move |_| set_count.update(|count| *count += 1) class="rounded px-3 py-2 m-1 border-b-4 border-l-2 shadow-lg bg-blue-700 border-blue-800 text-white">
-                        "+"
-                    </button>
-                    <button class="rounded px-3 py-2 m-1 border-b-4 border-l-2 shadow-lg bg-blue-800 border-blue-900 text-white">
-                        {count}
-                    </button>
-                    <button on:click=move |_| set_count.update(|count| *count -= 1) class="rounded px-3 py-2 m-1 border-b-4 border-l-2 shadow-lg bg-blue-700 border-blue-800 text-white">
-                        "-"
-                    </button>
-                </div>
+        <div class="min-h-screen bg-gray-100 dark:bg-gray-800 dark:text-white">
+          <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
+            <div class="flex items-center">
+              <h1 class="text-2xl font-bold mr-4">CI Deployments</h1>
+              <button
+                type="button"
+                role="combobox"
+                aria-controls="radix-:r1k:"
+                aria-expanded="false"
+                aria-autocomplete="none"
+                dir="ltr"
+                data-state="closed"
+                data-placeholder=""
+                class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span style="pointer-events: none;">Select a Repository</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="h-4 w-4 opacity-50"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6"></path>
+                </svg>
+              </button>
             </div>
-        </main>
+          </header>
+          <Deployments/>
+        </div>
+    }
+}
+
+#[component]
+fn WorkflowCard(workflow: Workflow) -> impl IntoView {
+    let local_time: DateTime<Local> = DateTime::from(workflow.created_at);
+    view! {
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+          <div class="p-6">
+            <h2 class="text-xl font-bold mb-2">{workflow.commit_message}</h2>
+            <p class="text-sm mb-4">Created {format!("{}", local_time.format("%d %b, %Y, %H:%M"))}</p>
+            <p class="text-green-500 mb-4">Status: Success</p>
+            <h3 class="text-lg font-bold">Environments:</h3>
+            <div class="flex flex-wrap justify-start gap-2">
+            <For
+              each=move || workflow.waves.clone().into_iter()
+              key=|w| w.name.clone()
+              children=move |w: Wave| {
+                  view! {
+                      <span class="px-2 py-1 bg-green-500 text-white rounded">{w.name}</span>
+                  }
+              }
+            />
+            </div>
+          </div>
+        </div>
+    }
+}
+
+#[component]
+fn Deployments() -> impl IntoView {
+    let (owner, _set_owner) = create_signal("dglsparsons".to_string());
+    let (repo, _set_repo) = create_signal("deploy-testing".to_string());
+    let workflows = create_resource(
+        move || (owner.get(), repo.get()),
+        |(owner, repo)| list_workflows(owner, repo),
+    );
+
+    let title = move || format!("{}/{}", owner(), repo());
+    view! {
+        <Title text={title}/>
+        <Suspense
+            fallback=move || view! { <p>"Loading..."</p> }
+        >
+            <main class="p-6 grid grid-cols-1 gap-4">
+            {
+                workflows.get().map(|w| match w {
+                    Ok(w) => {
+                        view! {
+                            <For
+                              each=move || w.clone()
+                              key=|w| w.id.clone()
+                              children=move |w: Workflow| {
+                                  view! {
+                                      <WorkflowCard workflow=w/>
+                                  }
+                              }
+                            />
+                        }.into_view()
+                    },
+                    Err(e) => {
+                        view! {
+                            <p>Something went wrong: {format!("{}", e)}</p>
+                        }.into_view()
+                    },
+                })
+            }
+            </main>
+        </Suspense>
     }
 }

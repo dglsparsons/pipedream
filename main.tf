@@ -43,7 +43,7 @@ provider "aws" {
 resource "aws_dynamodb_table" "workflows" {
   name         = "${local.prefix}-workflows"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "id"
+  hash_key     = "id" # composite of owner/repo
   range_key    = "created_at"
 
   attribute {
@@ -113,6 +113,10 @@ output "access_key" {
   value = aws_iam_access_key.pipedream.id
 }
 
-output "encypted_secret_access_key" {
+output "encrypted_secret_access_key" {
   value = aws_iam_access_key.pipedream.encrypted_secret
+}
+
+output "table_name" {
+  value = aws_dynamodb_table.workflows.name
 }

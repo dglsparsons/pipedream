@@ -5,7 +5,7 @@ RUN tar -xvf cargo-binstall-x86_64-unknown-linux-musl.tgz
 RUN cp cargo-binstall /usr/local/cargo/bin
 
 # Install cargo-leptos
-RUN cargo binstall cargo-leptos@0.1.11 -y
+RUN cargo binstall cargo-leptos@0.2.2 -y
 
 # Add the WASM target
 RUN rustup target add wasm32-unknown-unknown
@@ -18,7 +18,7 @@ COPY . .
 RUN cargo leptos build --release -vv
 
 FROM rustlang/rust:nightly-bullseye as runner
-COPY --from=builder /app/target/server/release/pipedream /app/
+COPY --from=builder /app/target/release/pipedream /app/
 # /target/site contains our JS/WASM/CSS, etc.
 COPY --from=builder /app/target/site /app/site
 # Copy Cargo.toml if it’s needed at runtime
