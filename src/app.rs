@@ -98,7 +98,7 @@ fn HomePage() -> impl IntoView {
         <div class="min-h-screen bg-gray-100 dark:bg-gray-800 dark:text-white">
           <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
             <div class="flex items-center">
-              <h1 class="text-2xl font-bold mr-4">CI Deployments</h1>
+              <h1 class="text-2xl font-bold mr-4">Deployments</h1>
               <button
                 type="button"
                 role="combobox"
