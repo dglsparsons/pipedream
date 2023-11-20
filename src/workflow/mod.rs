@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +15,17 @@ pub enum Status {
     Running,
     Success,
     Failure,
+}
+
+impl Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Status::Paused => "Paused",
+            Status::Running => "Running",
+            Status::Success => "Success",
+            Status::Failure => "Failure",
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq)]

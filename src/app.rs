@@ -2,13 +2,14 @@
 use super::workflow;
 use crate::{
     error_template::{AppError, ErrorTemplate},
-    workflow::{Wave, Workflow},
+    workflow::{Wave, WaveStatus, Workflow},
 };
 use chrono::{DateTime, Local};
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -141,7 +142,7 @@ fn WorkflowCard(workflow: Workflow) -> impl IntoView {
           <div class="p-6">
             <h2 class="text-xl font-bold mb-2">{workflow.commit_message}</h2>
             <p class="text-sm mb-4">Created {format!("{}", local_time.format("%d %b, %Y, %H:%M"))}</p>
-            <p class="text-green-500 mb-4">Status: Success</p>
+            <p class="text-green-500 mb-4">Status: {format!("{}", workflow.status)}</p>
             <h3 class="text-lg font-bold">Environments:</h3>
             <div class="flex flex-wrap justify-start gap-2">
             <For
@@ -149,7 +150,15 @@ fn WorkflowCard(workflow: Workflow) -> impl IntoView {
               key=|w| w.name.clone()
               children=move |w: Wave| {
                   view! {
-                      <span class="px-2 py-1 bg-green-500 text-white rounded">{w.name}</span>
+                      <span
+                          class="px-2 py-1 text-white rounded"
+                          class=("bg-green-500", move || w.status == WaveStatus::Success)
+                          class=("bg-red-500", move || w.status == WaveStatus::Failure)
+                          class=("bg-yellow-500", move || w.status == WaveStatus::Running)
+                          class=("bg-gray-500", move || w.status == WaveStatus::Pending)
+                      >
+                          {w.name}
+                      </span>
                   }
               }
             />
@@ -164,19 +173,32 @@ fn Deployments() -> impl IntoView {
     let (owner, _set_owner) = create_signal("dglsparsons".to_string());
     let (repo, _set_repo) = create_signal("deploy-testing".to_string());
     let workflows = create_resource(
-        move || (owner.get(), repo.get()),
+        move || (owner(), repo()),
         |(owner, repo)| list_workflows(owner, repo),
     );
+    create_effect(move |_| {
+        let handle = set_interval_with_handle(
+            move || {
+                workflows.refetch();
+            },
+            Duration::from_secs(5),
+        )
+        .expect("interval to be created");
+
+        on_cleanup(move || {
+            handle.clear();
+        })
+    });
 
     let title = move || format!("{}/{}", owner(), repo());
     view! {
         <Title text={title}/>
-        <Suspense
+        <Transition
             fallback=move || view! { <p>"Loading..."</p> }
         >
             <main class="p-6 grid grid-cols-1 gap-4">
             {
-                workflows.get().map(|w| match w {
+                move || workflows.get().map(|w| match w {
                     Ok(w) => {
                         view! {
                             <For
@@ -198,6 +220,6 @@ fn Deployments() -> impl IntoView {
                 })
             }
             </main>
-        </Suspense>
+        </Transition>
     }
 }
