@@ -6,12 +6,24 @@ async fn main() {
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use pipedream::app::*;
     use pipedream::fileserv::file_and_error_handler;
+    use pipedream::workflow;
+    use tokio::time::{sleep, Duration};
 
     simple_logger::init_with_level(log::Level::Debug).expect("couldn't initialize logging");
     let conf = get_configuration(None).await.unwrap();
     let leptos_options = conf.leptos_options;
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(App);
+
+    tokio::spawn(async move {
+        let client = workflow::client().await;
+        loop {
+            if let Err(e) = workflow::process_workflows(client).await {
+                log::error!("error processing workflows: {}", e);
+            }
+            sleep(Duration::from_secs(10)).await
+        }
+    });
 
     let app = Router::new()
         .route("/api/*fn_name", post(leptos_axum::handle_server_fns))

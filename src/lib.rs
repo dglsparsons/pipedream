@@ -4,7 +4,7 @@ pub mod app;
 mod aws;
 pub mod error_template;
 pub mod fileserv;
-mod workflow;
+pub mod workflow;
 
 cfg_if! { if #[cfg(feature = "hydrate")] {
     use leptos::*;

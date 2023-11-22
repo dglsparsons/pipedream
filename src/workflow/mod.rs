@@ -9,6 +9,12 @@ mod client;
 #[cfg(feature = "ssr")]
 pub use client::*;
 
+#[cfg(feature = "ssr")]
+mod processor;
+
+#[cfg(feature = "ssr")]
+pub use processor::process_workflows;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq)]
 pub enum Status {
     Paused,
@@ -36,6 +42,17 @@ pub enum WaveStatus {
     Failure,
 }
 
+impl From<WaveStatus> for Status {
+    fn from(val: WaveStatus) -> Self {
+        match val {
+            WaveStatus::Pending => Status::Running,
+            WaveStatus::Running => Status::Running,
+            WaveStatus::Success => Status::Success,
+            WaveStatus::Failure => Status::Failure,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Wave {
     pub name: String,
@@ -48,6 +65,7 @@ pub struct Wave {
 pub struct Workflow {
     pub id: String,
     pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub github_token: String,
     pub git_ref: String,
     pub owner: String,
@@ -58,6 +76,17 @@ pub struct Workflow {
     pub workflow: String,
     pub status: Status,
     pub commit_message: String,
+}
+
+impl Workflow {
+    pub fn next_wave(&self) -> Option<(usize, &Wave)> {
+        let idx = self
+            .waves
+            .iter()
+            .position(|w| w.status == WaveStatus::Running || w.status == WaveStatus::Pending);
+
+        idx.and_then(|idx| self.waves.get(idx).map(|w| (idx, w)))
+    }
 }
 
 #[cfg(feature = "ssr")]

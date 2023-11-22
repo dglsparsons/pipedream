@@ -8,9 +8,8 @@ use aws_sdk_dynamodb::types::ReturnValue;
 use aws_sdk_dynamodb::Client;
 use aws_types::sdk_config;
 use serde::{Deserialize, Serialize};
-use serde_dynamo::{from_item, from_items, to_attribute_value, to_item};
-
-pub use aws_sdk_dynamodb::types::AttributeValue;
+use serde_dynamo::{from_item, from_items, to_item};
+pub use serde_dynamo::to_attribute_value;
 
 #[derive(Clone)]
 pub struct DynamodbClient {
