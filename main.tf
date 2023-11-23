@@ -85,6 +85,7 @@ data "aws_iam_policy_document" "workflows_dynamodb" {
     ]
     resources = [
       aws_dynamodb_table.workflows.arn,
+      "${aws_dynamodb_table.workflows.arn}/index/*",
     ]
   }
 }

@@ -1,6 +1,5 @@
 use anyhow::Context;
 use http::StatusCode;
-use leptos::logging;
 use reqwest::{header, Client};
 use serde::Serialize;
 use tokio::sync::OnceCell;
@@ -60,7 +59,7 @@ pub async fn run_workflow(req: WorkflowRequest<'_>) -> Result<(), anyhow::Error>
         .await
         .unwrap_or_else(|_| "no error message".to_string());
 
-    logging::warn!(
+    log::warn!(
         "workflow dispatch via github, status={}, text={}",
         status.clone().as_u16(),
         text

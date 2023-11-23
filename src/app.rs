@@ -83,7 +83,7 @@ pub async fn list_workflows(
 ) -> Result<Vec<workflow::Workflow>, ServerFnError> {
     match workflow::client().await.list(owner, repo).await {
         Err(e) => {
-            logging::error!("failed to list workflows: {:#}", e);
+            log::error!("failed to list workflows: {:#}", e);
             Err(ServerFnError::ServerError(
                 "unable to list workflows".to_string(),
             ))

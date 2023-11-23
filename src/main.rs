@@ -17,9 +17,13 @@ async fn main() {
 
     tokio::spawn(async move {
         let client = workflow::client().await;
+        if std::env::var("LEPTOS_WORKER").is_err() {
+            log::warn!("not starting worker due to missing LEPTOS_WORKER env");
+            return;
+        }
         loop {
             if let Err(e) = workflow::process_workflows(client).await {
-                log::error!("error processing workflows: {}", e);
+                log::error!("error processing workflows: {0:#}", e);
             }
             sleep(Duration::from_secs(10)).await
         }

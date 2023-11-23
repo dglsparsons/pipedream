@@ -76,6 +76,7 @@ pub struct Workflow {
     pub workflow: String,
     pub status: Status,
     pub commit_message: String,
+    pub due_to_run: DateTime<Utc>,
 }
 
 impl Workflow {

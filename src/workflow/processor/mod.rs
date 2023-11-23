@@ -1,10 +1,11 @@
 use super::WaveStatus;
 use anyhow::Context;
+use chrono::Utc;
 
 mod github;
 
 pub async fn process_workflows(client: &'static super::Client) -> Result<(), anyhow::Error> {
-    let workflows = client.get_to_process().await?;
+    let workflows = client.get_due_to_run(Utc::now()).await?;
 
     let futures: Vec<_> = workflows
         .into_iter()
@@ -36,8 +37,11 @@ async fn process_workflow(
         Some((idx, w)) => {
             if w.status == WaveStatus::Running {
                 // it's running, so do nothing.
+                log::info!("skipping wave {} as it is already running", w.name);
                 return Ok(());
             };
+
+            log::info!("picked up wave {} to process", w.name);
 
             github::run_workflow(github::WorkflowRequest {
                 owner: &workflow.owner,
@@ -51,6 +55,9 @@ async fn process_workflow(
             .await
             .context("running github workflow")?;
 
+            log::info!("wave {} started", w.name);
+
+            let wavename = w.name.clone();
             let mut waves = workflow.waves.clone();
             if let Some(wave) = waves.get_mut(idx) {
                 wave.status = WaveStatus::Running;
@@ -59,6 +66,8 @@ async fn process_workflow(
                 .update_waves(workflow, waves)
                 .await
                 .context("updating step status")?;
+
+            log::info!("wave {} status updated in database", wavename);
 
             // Then register a webhook to call back to for updating the status
             // and setting the time of the next wave? Or just poll forever.
