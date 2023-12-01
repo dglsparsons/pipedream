@@ -46,6 +46,7 @@ pub async fn run_workflow(req: WorkflowRequest<'_>) -> Result<(), anyhow::Error>
             git_ref: req.git_ref,
             inputs: Inputs { wave: req.wave },
         })
+        .header(header::USER_AGENT, "pipedream")
         .header(header::ACCEPT, "application/vnd.github+json")
         .header(header::AUTHORIZATION, format!("Bearer {}", req.token))
         .header("X-GitHub-Api-Version", "2022-11-28")
@@ -65,7 +66,7 @@ pub async fn run_workflow(req: WorkflowRequest<'_>) -> Result<(), anyhow::Error>
         text
     );
 
-    if status != StatusCode::OK {
+    if status != StatusCode::NO_CONTENT {
         return Err(anyhow::anyhow!("failed to dispatch github workflow"));
     }
 
