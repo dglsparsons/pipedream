@@ -3,6 +3,7 @@ pub mod app;
 #[cfg(feature = "ssr")]
 mod aws;
 pub mod error_template;
+#[cfg(feature = "ssr")]
 pub mod fileserv;
 pub mod workflow;
 

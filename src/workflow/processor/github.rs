@@ -1,6 +1,5 @@
 use anyhow::Context;
-use http::StatusCode;
-use reqwest::{header, Client};
+use reqwest::{header, Client, StatusCode};
 use serde::Serialize;
 use tokio::sync::OnceCell;
 

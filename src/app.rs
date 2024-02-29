@@ -69,7 +69,7 @@ pub async fn create_workflow(
             commit_message,
         })
         .await
-        .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+        .map_err(|e| ServerFnError::new(e))?;
 
     Ok(Response {
         url: format!("https://pipedream.fly.dev/{}/{}/{}", owner, repo, sha),
@@ -84,9 +84,7 @@ pub async fn list_workflows(
     match workflow::client().await.list(owner, repo).await {
         Err(e) => {
             log::error!("failed to list workflows: {:#}", e);
-            Err(ServerFnError::ServerError(
-                "unable to list workflows".to_string(),
-            ))
+            Err(ServerFnError::new("unable to list workflows"))
         }
         Ok(v) => Ok(v),
     }
