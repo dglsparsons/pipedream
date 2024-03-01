@@ -66,7 +66,6 @@ pub struct Workflow {
     pub id: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
-    pub github_token: String,
     pub git_ref: String,
     pub owner: String,
     pub repo: String,

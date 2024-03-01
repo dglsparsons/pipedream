@@ -36,7 +36,6 @@ impl Client {
             .put_item(Workflow {
                 id: workflow.owner.clone() + "/" + &workflow.repo,
                 created_at: chrono::Utc::now(),
-                github_token: workflow.github_token.clone(),
                 git_ref: workflow.git_ref.clone(),
                 owner: workflow.owner.clone(),
                 repo: workflow.repo.clone(),

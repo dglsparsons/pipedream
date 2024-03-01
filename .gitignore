@@ -12,3 +12,6 @@ test-results/
 end2end/playwright-report/
 playwright/.cache/
 .terraform/
+
+# Ignore private key files
+*.pem

@@ -50,7 +50,6 @@ async fn process_workflow(
                 wave: &w.name,
                 git_ref: &workflow.git_ref,
                 sha: &workflow.sha,
-                token: &workflow.github_token,
             })
             .await
             .context("running github workflow")?;
