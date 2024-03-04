@@ -1,4 +1,4 @@
-use super::{Status, Wave, WaveStatus, Workflow};
+use super::{Environment, Status, WaveStatus, Workflow};
 use crate::aws::{config, to_attribute_value, DynamodbClient};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
@@ -22,10 +22,10 @@ impl Client {
         &self,
         workflow: super::CreateWorkflowRequest,
     ) -> Result<(), anyhow::Error> {
-        let waves = workflow
-            .waves
+        let environments = workflow
+            .environments
             .into_iter()
-            .map(|w| Wave {
+            .map(|w| Environment {
                 name: w,
                 status: WaveStatus::Pending,
                 started_at: None,
@@ -41,8 +41,7 @@ impl Client {
                 repo: workflow.repo.clone(),
                 sha: workflow.sha.clone(),
                 stability_period_minutes: workflow.stability_period_minutes,
-                waves,
-                workflow: workflow.workflow.clone(),
+                environments,
                 status: Status::Running,
                 commit_message: workflow.commit_message.clone(),
                 updated_at: None,
@@ -116,7 +115,7 @@ impl Client {
     pub(crate) async fn update_waves(
         &self,
         w: Workflow,
-        waves: Vec<Wave>,
+        waves: Vec<Environment>,
     ) -> Result<(), anyhow::Error> {
         log::info!("updating waves for workflow {}, {}", w.id, w.created_at);
 

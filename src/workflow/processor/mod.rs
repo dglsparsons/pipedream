@@ -25,9 +25,9 @@ async fn process_workflow(
     match workflow.next_wave() {
         None => {
             // Nothing to do, mark the workflow as done. To do this,
-            // find the last wave with a status of Success or Failure, and use that as the status.
+            // find the last environment with a status of Success or Failure, and use that as the status.
             let w = workflow
-                .waves
+                .environments
                 .iter()
                 .rev()
                 .find(|w| w.status == WaveStatus::Success || w.status == WaveStatus::Failure);
@@ -37,36 +37,35 @@ async fn process_workflow(
         Some((idx, w)) => {
             if w.status == WaveStatus::Running {
                 // it's running, so do nothing.
-                log::info!("skipping wave {} as it is already running", w.name);
+                log::info!("skipping environment {} as it is already deploying", w.name);
                 return Ok(());
             };
 
-            log::info!("picked up wave {} to process", w.name);
+            log::info!("picked up environment {} to process", w.name);
 
-            github::run_workflow(github::WorkflowRequest {
+            github::create_deployment(github::CreateDeploymentRequest {
                 owner: &workflow.owner,
                 repo: &workflow.repo,
-                workflow: &workflow.workflow,
-                wave: &w.name,
+                environment: &w.name,
                 git_ref: &workflow.git_ref,
-                sha: &workflow.sha,
+                description: "created by pipedream",
             })
             .await
             .context("running github workflow")?;
 
-            log::info!("wave {} started", w.name);
+            log::info!("environment {} started", w.name);
 
-            let wavename = w.name.clone();
-            let mut waves = workflow.waves.clone();
-            if let Some(wave) = waves.get_mut(idx) {
-                wave.status = WaveStatus::Running;
+            let environment_name = w.name.clone();
+            let mut environments = workflow.environments.clone();
+            if let Some(environment) = environments.get_mut(idx) {
+                environment.status = WaveStatus::Running;
             }
             client
-                .update_waves(workflow, waves)
+                .update_waves(workflow, environments)
                 .await
                 .context("updating step status")?;
 
-            log::info!("wave {} status updated in database", wavename);
+            log::info!("wave {} status updated in database", environment_name);
 
             // Then register a webhook to call back to for updating the status
             // and setting the time of the next wave? Or just poll forever.

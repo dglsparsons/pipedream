@@ -2,7 +2,7 @@
 use super::workflow;
 use crate::{
     error_template::{AppError, ErrorTemplate},
-    workflow::{Wave, WaveStatus, Workflow},
+    workflow::{Environment, WaveStatus, Workflow},
 };
 use chrono::{DateTime, Local};
 use leptos::*;
@@ -41,31 +41,27 @@ pub struct Response {
 
 #[server(CreateWorkflow, "/api", "Url", "workflow")]
 pub async fn create_workflow(
-    github_token: String,
     git_ref: String,
     repo: String,
     owner: String,
     sha: String,
     stability_period_minutes: usize,
-    waves: String,
-    workflow: String,
+    environments: String,
     commit_message: String,
 ) -> Result<Response, ServerFnError> {
-    let waves = waves
+    let environments = environments
         .split(',')
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
     workflow::client()
         .await
         .create(workflow::CreateWorkflowRequest {
-            github_token,
             git_ref,
             repo: repo.clone(),
             owner: owner.clone(),
             sha: sha.clone(),
             stability_period_minutes,
-            waves,
-            workflow,
+            environments,
             commit_message,
         })
         .await
@@ -144,9 +140,9 @@ fn WorkflowCard(workflow: Workflow) -> impl IntoView {
             <h3 class="text-lg font-bold">Environments:</h3>
             <div class="flex flex-wrap justify-start gap-2">
             <For
-              each=move || workflow.waves.clone().into_iter()
+              each=move || workflow.environments.clone().into_iter()
               key=|w| w.name.clone()
-              children=move |w: Wave| {
+              children=move |w: Environment| {
                   view! {
                       <span
                           class="px-2 py-1 text-white rounded"

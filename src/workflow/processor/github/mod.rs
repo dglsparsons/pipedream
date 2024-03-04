@@ -13,13 +13,12 @@ async fn http() -> &'static Client {
     CONFIG.get_or_init(new_client).await
 }
 
-pub struct WorkflowRequest<'a> {
+pub struct CreateDeploymentRequest<'a> {
     pub owner: &'a str,
     pub repo: &'a str,
-    pub workflow: &'a str,
-    pub wave: &'a str,
     pub git_ref: &'a str,
-    pub sha: &'a str,
+    pub environment: &'a str,
+    pub description: &'a str,
 }
 
 #[derive(Debug, Serialize)]
@@ -29,9 +28,10 @@ struct Inputs<'a> {
 
 #[derive(Debug, Serialize)]
 struct RequestBody<'a> {
-    #[serde(rename = "ref")]
-    git_ref: &'a str,
+    r#ref: &'a str,
     inputs: Inputs<'a>,
+    environment: &'a str,
+    description: &'a str,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -161,7 +161,7 @@ pub async fn create_access_token(org: String, repo: String) -> Result<String, an
     return Ok(access_token.token);
 }
 
-pub async fn run_workflow(req: WorkflowRequest<'_>) -> Result<(), anyhow::Error> {
+pub async fn create_deployment(req: CreateDeploymentRequest<'_>) -> Result<(), anyhow::Error> {
     let access_token = create_access_token(req.owner.to_string(), req.repo.to_string())
         .await
         .context("creating access token")?;
@@ -169,12 +169,16 @@ pub async fn run_workflow(req: WorkflowRequest<'_>) -> Result<(), anyhow::Error>
     let res = http()
         .await
         .post(format!(
-            "https://api.github.com/repos/{}/{}/actions/workflows/{}/dispatches",
-            req.owner, req.repo, req.workflow
+            "https://api.github.com/repos/{}/{}/deployments?auto_merge=false",
+            req.owner, req.repo,
         ))
         .json(&RequestBody {
-            git_ref: req.git_ref,
-            inputs: Inputs { wave: req.wave },
+            description: req.description,
+            environment: req.environment,
+            r#ref: req.git_ref,
+            inputs: Inputs {
+                wave: req.environment,
+            },
         })
         .header(header::USER_AGENT, "pipedream")
         .header(header::ACCEPT, "application/vnd.github+json")
@@ -191,12 +195,12 @@ pub async fn run_workflow(req: WorkflowRequest<'_>) -> Result<(), anyhow::Error>
         .unwrap_or_else(|_| "no error message".to_string());
 
     log::info!(
-        "workflow dispatch via github, status={}, text={}",
+        "deployment created, status={}, text={}",
         status.clone().as_u16(),
         text
     );
 
-    if status != StatusCode::NO_CONTENT {
+    if status != StatusCode::ACCEPTED && status != StatusCode::CREATED {
         return Err(anyhow::anyhow!("failed to dispatch github workflow"));
     }
 

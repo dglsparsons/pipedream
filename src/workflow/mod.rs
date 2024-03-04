@@ -54,7 +54,7 @@ impl From<WaveStatus> for Status {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Wave {
+pub struct Environment {
     pub name: String,
     pub status: WaveStatus,
     pub started_at: Option<DateTime<Utc>>,
@@ -71,33 +71,30 @@ pub struct Workflow {
     pub repo: String,
     pub sha: String,
     pub stability_period_minutes: usize,
-    pub waves: Vec<Wave>,
-    pub workflow: String,
+    pub environments: Vec<Environment>,
     pub status: Status,
     pub commit_message: String,
     pub due_to_run: DateTime<Utc>,
 }
 
 impl Workflow {
-    pub fn next_wave(&self) -> Option<(usize, &Wave)> {
+    pub fn next_wave(&self) -> Option<(usize, &Environment)> {
         let idx = self
-            .waves
+            .environments
             .iter()
             .position(|w| w.status == WaveStatus::Running || w.status == WaveStatus::Pending);
 
-        idx.and_then(|idx| self.waves.get(idx).map(|w| (idx, w)))
+        idx.and_then(|idx| self.environments.get(idx).map(|w| (idx, w)))
     }
 }
 
 #[cfg(feature = "ssr")]
 pub struct CreateWorkflowRequest {
-    pub github_token: String,
     pub git_ref: String,
     pub owner: String,
     pub repo: String,
     pub sha: String,
     pub stability_period_minutes: usize,
-    pub waves: Vec<String>,
-    pub workflow: String,
+    pub environments: Vec<String>,
     pub commit_message: String,
 }
