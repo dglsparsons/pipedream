@@ -118,6 +118,8 @@ impl Client {
         w: Workflow,
         waves: Vec<Wave>,
     ) -> Result<(), anyhow::Error> {
+        log::info!("updating waves for workflow {}, {}", w.id, w.created_at);
+
         self.table
             .run_update(
                 self.table
