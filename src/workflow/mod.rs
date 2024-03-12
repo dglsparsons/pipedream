@@ -35,20 +35,20 @@ impl Display for Status {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq)]
-pub enum WaveStatus {
+pub enum EnvironmentStatus {
     Pending,
     Running,
     Success,
     Failure,
 }
 
-impl From<WaveStatus> for Status {
-    fn from(val: WaveStatus) -> Self {
+impl From<EnvironmentStatus> for Status {
+    fn from(val: EnvironmentStatus) -> Self {
         match val {
-            WaveStatus::Pending => Status::Running,
-            WaveStatus::Running => Status::Running,
-            WaveStatus::Success => Status::Success,
-            WaveStatus::Failure => Status::Failure,
+            EnvironmentStatus::Pending => Status::Running,
+            EnvironmentStatus::Running => Status::Running,
+            EnvironmentStatus::Success => Status::Success,
+            EnvironmentStatus::Failure => Status::Failure,
         }
     }
 }
@@ -56,15 +56,39 @@ impl From<WaveStatus> for Status {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Environment {
     pub name: String,
-    pub status: WaveStatus,
+    pub status: EnvironmentStatus,
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct CreatedAt(DateTime<Utc>);
+
+impl CreatedAt {
+    fn to_rfc3339(&self) -> String {
+        self.0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+    }
+
+    #[cfg(feature = "ssr")]
+    fn now() -> Self {
+        CreatedAt(Utc::now())
+    }
+
+    pub fn to_dt(&self) -> DateTime<Utc> {
+        self.0
+    }
+}
+
+impl Serialize for CreatedAt {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_rfc3339())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Workflow {
     pub id: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: CreatedAt,
     pub updated_at: Option<DateTime<Utc>>,
     pub git_ref: String,
     pub owner: String,
@@ -78,11 +102,10 @@ pub struct Workflow {
 }
 
 impl Workflow {
-    pub fn next_wave(&self) -> Option<(usize, &Environment)> {
-        let idx = self
-            .environments
-            .iter()
-            .position(|w| w.status == WaveStatus::Running || w.status == WaveStatus::Pending);
+    pub fn next_environment(&self) -> Option<(usize, &Environment)> {
+        let idx = self.environments.iter().position(|w| {
+            w.status == EnvironmentStatus::Running || w.status == EnvironmentStatus::Pending
+        });
 
         idx.and_then(|idx| self.environments.get(idx).map(|w| (idx, w)))
     }

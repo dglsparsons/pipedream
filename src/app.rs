@@ -2,7 +2,7 @@
 use super::workflow;
 use crate::{
     error_template::{AppError, ErrorTemplate},
-    workflow::{Environment, WaveStatus, Workflow},
+    workflow::{Environment, EnvironmentStatus, Workflow},
 };
 use chrono::{DateTime, Local};
 use leptos::*;
@@ -130,7 +130,7 @@ fn HomePage() -> impl IntoView {
 
 #[component]
 fn WorkflowCard(workflow: Workflow) -> impl IntoView {
-    let local_time: DateTime<Local> = DateTime::from(workflow.created_at);
+    let local_time: DateTime<Local> = DateTime::from(workflow.created_at.to_dt());
     view! {
         <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
           <div class="p-6">
@@ -146,10 +146,10 @@ fn WorkflowCard(workflow: Workflow) -> impl IntoView {
                   view! {
                       <span
                           class="px-2 py-1 text-white rounded"
-                          class=("bg-green-500", move || w.status == WaveStatus::Success)
-                          class=("bg-red-500", move || w.status == WaveStatus::Failure)
-                          class=("bg-yellow-500", move || w.status == WaveStatus::Running)
-                          class=("bg-gray-500", move || w.status == WaveStatus::Pending)
+                          class=("bg-green-500", move || w.status == EnvironmentStatus::Success)
+                          class=("bg-red-500", move || w.status == EnvironmentStatus::Failure)
+                          class=("bg-yellow-500", move || w.status == EnvironmentStatus::Running)
+                          class=("bg-gray-500", move || w.status == EnvironmentStatus::Pending)
                       >
                           {w.name}
                       </span>

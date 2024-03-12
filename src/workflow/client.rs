@@ -1,4 +1,4 @@
-use super::{Environment, Status, WaveStatus, Workflow};
+use super::{CreatedAt, Environment, EnvironmentStatus, Status, Workflow};
 use crate::aws::{config, to_attribute_value, DynamodbClient};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
@@ -27,7 +27,7 @@ impl Client {
             .into_iter()
             .map(|w| Environment {
                 name: w,
-                status: WaveStatus::Pending,
+                status: EnvironmentStatus::Pending,
                 started_at: None,
                 finished_at: None,
             })
@@ -35,7 +35,7 @@ impl Client {
         self.table
             .put_item(Workflow {
                 id: workflow.owner.clone() + "/" + &workflow.repo,
-                created_at: chrono::Utc::now(),
+                created_at: CreatedAt::now(),
                 git_ref: workflow.git_ref.clone(),
                 owner: workflow.owner.clone(),
                 repo: workflow.repo.clone(),
@@ -112,12 +112,16 @@ impl Client {
         Ok(())
     }
 
-    pub(crate) async fn update_waves(
+    pub(crate) async fn update_environments(
         &self,
         w: Workflow,
-        waves: Vec<Environment>,
+        environments: Vec<Environment>,
     ) -> Result<(), anyhow::Error> {
-        log::info!("updating waves for workflow {}, {}", w.id, w.created_at);
+        log::info!(
+            "updating environments for workflow {}, {}",
+            w.id,
+            w.created_at.to_rfc3339()
+        );
 
         self.table
             .run_update(
@@ -125,11 +129,15 @@ impl Client {
                     .update()
                     .key("id", to_attribute_value(w.id)?)
                     .key("created_at", to_attribute_value(w.created_at.to_rfc3339())?)
-                    .update_expression("SET #waves = :waves, #updated_at = :updated_at")
-                    .condition_expression("attribute_exists(id) and attribute_exists(created_at)")
-                    .expression_attribute_names("#waves", "waves")
+                    .update_expression(
+                        "SET #environments = :environments, #updated_at = :updated_at",
+                    )
+                    .condition_expression("attribute_exists(#id) and attribute_exists(#created_at)")
+                    .expression_attribute_names("#environments", "environments")
                     .expression_attribute_names("#updated_at", "updated_at")
-                    .expression_attribute_values(":waves", to_attribute_value(waves)?)
+                    .expression_attribute_names("#id", "id")
+                    .expression_attribute_names("#created_at", "created_at")
+                    .expression_attribute_values(":environments", to_attribute_value(environments)?)
                     .expression_attribute_values(":updated_at", to_attribute_value(Utc::now())?),
             )
             .await?;

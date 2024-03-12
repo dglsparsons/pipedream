@@ -22,14 +22,8 @@ pub struct CreateDeploymentRequest<'a> {
 }
 
 #[derive(Debug, Serialize)]
-struct Inputs<'a> {
-    wave: &'a str,
-}
-
-#[derive(Debug, Serialize)]
 struct RequestBody<'a> {
     r#ref: &'a str,
-    inputs: Inputs<'a>,
     environment: &'a str,
     description: &'a str,
 }
@@ -176,9 +170,6 @@ pub async fn create_deployment(req: CreateDeploymentRequest<'_>) -> Result<(), a
             description: req.description,
             environment: req.environment,
             r#ref: req.git_ref,
-            inputs: Inputs {
-                wave: req.environment,
-            },
         })
         .header(header::USER_AGENT, "pipedream")
         .header(header::ACCEPT, "application/vnd.github+json")
