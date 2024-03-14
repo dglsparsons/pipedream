@@ -116,14 +116,15 @@ impl Client {
         &self,
         w: Workflow,
         environments: Vec<Environment>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<Workflow, anyhow::Error> {
         log::info!(
             "updating environments for workflow {}, {}",
             w.id,
             w.created_at.to_rfc3339()
         );
 
-        self.table
+        Ok(self
+            .table
             .run_update(
                 self.table
                     .update()
@@ -140,9 +141,7 @@ impl Client {
                     .expression_attribute_values(":environments", to_attribute_value(environments)?)
                     .expression_attribute_values(":updated_at", to_attribute_value(Utc::now())?),
             )
-            .await?;
-
-        Ok(())
+            .await?)
     }
 }
 
