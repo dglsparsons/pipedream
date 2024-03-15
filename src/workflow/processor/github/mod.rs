@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use anyhow::Context;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use reqwest::{header, Client, StatusCode};
@@ -26,6 +27,7 @@ struct RequestBody<'a> {
     r#ref: &'a str,
     environment: &'a str,
     description: &'a str,
+    auto_merge: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -155,11 +157,102 @@ pub async fn create_access_token(org: String, repo: String) -> Result<String, an
     return Ok(access_token.token);
 }
 
-pub async fn create_deployment(req: CreateDeploymentRequest<'_>) -> Result<(), anyhow::Error> {
-    let access_token = create_access_token(req.owner.to_string(), req.repo.to_string())
-        .await
-        .context("creating access token")?;
+// Github actions has way too many statuses, holy crap.
+#[derive(Debug, Deserialize)]
+pub enum WorkflowStatus {
+    #[serde(rename = "completed")]
+    Completed,
+    #[serde(rename = "action_required")]
+    ActionRequired,
+    #[serde(rename = "cancelled")]
+    Cancelled,
+    #[serde(rename = "failure")]
+    Failure,
+    #[serde(rename = "neutral")]
+    Neutral,
+    #[serde(rename = "skipped")]
+    Skipped,
+    #[serde(rename = "stale")]
+    Stale,
+    #[serde(rename = "success")]
+    Success,
+    #[serde(rename = "timed_out")]
+    TimedOut,
+    #[serde(rename = "in_progress")]
+    InProgress,
+    #[serde(rename = "queued")]
+    Queued,
+    #[serde(rename = "requested")]
+    Requested,
+    #[serde(rename = "waiting")]
+    Waiting,
+    #[serde(rename = "pending")]
+    Pending,
+}
 
+#[derive(Debug, Deserialize)]
+pub struct Workflow {
+    pub id: String,
+    pub name: String,
+    pub head_sha: String,
+    pub head_branch: String,
+    pub event: String,
+    pub status: WorkflowStatus,
+}
+
+#[derive(Debug, Deserialize)]
+struct ListWorkflowResponse {
+    total_count: i64,
+    workflow_runs: Vec<Workflow>,
+}
+
+pub async fn list_workflows(
+    token: &str,
+    owner: &str,
+    repo: &str,
+    sha: &str,
+    event: &str,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    let res = http()
+        .await
+        .get(format!(
+            "https://api.github.com/repos/{}/{}/actions/runs",
+            owner, repo
+        ))
+        .query(&[("branch", sha), ("per_page", "100"), ("event", event)])
+        .header(header::USER_AGENT, "pipedream")
+        .header(header::ACCEPT, "application/vnd.github+json")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(GITHUB_API_VERSION_HEADER, GITHUB_API_VERSION)
+        .send()
+        .await
+        .context("getting github workflow runs")?;
+
+    let status = res.status();
+    log::info!("listing workflows, status={}", status.clone().as_u16());
+
+    if status != StatusCode::OK {
+        let text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "no error message".to_string());
+        log::error!("failed to list workflows, status={}, text={}", status, text);
+        return Err(anyhow::anyhow!("failed to dispatch github workflow"));
+    }
+
+    let response = res
+        .json::<ListWorkflowResponse>()
+        .await
+        .context("parsing github workflow runs response")?;
+
+    // TODO - pagination :oh_no:
+    Ok(response.workflow_runs)
+}
+
+pub async fn create_deployment(
+    token: &str,
+    req: CreateDeploymentRequest<'_>,
+) -> Result<(), anyhow::Error> {
     let res = http()
         .await
         .post(format!(
@@ -170,10 +263,11 @@ pub async fn create_deployment(req: CreateDeploymentRequest<'_>) -> Result<(), a
             description: req.description,
             environment: req.environment,
             r#ref: req.git_ref,
+            auto_merge: false,
         })
         .header(header::USER_AGENT, "pipedream")
         .header(header::ACCEPT, "application/vnd.github+json")
-        .header(header::AUTHORIZATION, format!("Bearer {}", access_token))
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .header(GITHUB_API_VERSION_HEADER, GITHUB_API_VERSION)
         .send()
         .await
