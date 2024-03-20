@@ -5,6 +5,8 @@ use reqwest::{header, Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 
+use crate::workflow::EnvironmentStatus;
+
 async fn new_client() -> Client {
     Client::new()
 }
@@ -23,11 +25,12 @@ pub struct CreateDeploymentRequest<'a> {
 }
 
 #[derive(Debug, Serialize)]
-struct RequestBody<'a> {
+struct CreateDeploymentRequestBody<'a> {
     r#ref: &'a str,
     environment: &'a str,
     description: &'a str,
     auto_merge: bool,
+    required_contexts: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -192,7 +195,7 @@ pub enum WorkflowStatus {
 
 #[derive(Debug, Deserialize)]
 pub struct Workflow {
-    pub id: String,
+    pub id: u64,
     pub name: String,
     pub head_sha: String,
     pub head_branch: String,
@@ -219,7 +222,7 @@ pub async fn list_workflows(
             "https://api.github.com/repos/{}/{}/actions/runs",
             owner, repo
         ))
-        .query(&[("branch", sha), ("per_page", "100"), ("event", event)])
+        .query(&[("head_sha", sha), ("per_page", "100"), ("event", event)])
         .header(header::USER_AGENT, "pipedream")
         .header(header::ACCEPT, "application/vnd.github+json")
         .header(header::AUTHORIZATION, format!("Bearer {}", token))
@@ -249,21 +252,27 @@ pub async fn list_workflows(
     Ok(response.workflow_runs)
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateDeploymentResponse {
+    pub id: u64,
+}
+
 pub async fn create_deployment(
     token: &str,
     req: CreateDeploymentRequest<'_>,
-) -> Result<(), anyhow::Error> {
+) -> Result<CreateDeploymentResponse, anyhow::Error> {
     let res = http()
         .await
         .post(format!(
             "https://api.github.com/repos/{}/{}/deployments?auto_merge=false",
             req.owner, req.repo,
         ))
-        .json(&RequestBody {
+        .json(&CreateDeploymentRequestBody {
             description: req.description,
             environment: req.environment,
             r#ref: req.git_ref,
             auto_merge: false,
+            required_contexts: vec![],
         })
         .header(header::USER_AGENT, "pipedream")
         .header(header::ACCEPT, "application/vnd.github+json")
@@ -274,19 +283,91 @@ pub async fn create_deployment(
         .context("sending github workflow dispatch request")?;
 
     let status = res.status();
+    if status != StatusCode::ACCEPTED && status != StatusCode::CREATED {
+        let text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "no error message".to_string());
+
+        log::info!(
+            "failed to create deployment, status={}, text={}",
+            status.clone().as_u16(),
+            text
+        );
+        return Err(anyhow::anyhow!("failed to dispatch github workflow"));
+    }
+
+    let response = res
+        .json::<CreateDeploymentResponse>()
+        .await
+        .context("parsing github deployment response")?;
+
+    Ok(response)
+}
+
+#[derive(Debug, Serialize)]
+pub enum DeploymentStatus {
+    #[serde(rename = "queued")]
+    Queued,
+    #[serde(rename = "in_progress")]
+    InProgress,
+    #[serde(rename = "failure")]
+    Failure,
+    #[serde(rename = "success")]
+    Success,
+}
+
+impl From<EnvironmentStatus> for DeploymentStatus {
+    fn from(status: EnvironmentStatus) -> Self {
+        match status {
+            EnvironmentStatus::Pending => DeploymentStatus::Queued,
+            EnvironmentStatus::Queued => DeploymentStatus::Queued,
+            EnvironmentStatus::Running => DeploymentStatus::InProgress,
+            EnvironmentStatus::Success => DeploymentStatus::Success,
+            EnvironmentStatus::Failure => DeploymentStatus::Failure,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct UpdateStatusRequestBody {
+    state: DeploymentStatus,
+}
+
+pub async fn update_deployment_status(
+    token: &str,
+    owner: &str,
+    repo: &str,
+    deployment_id: &u64,
+    status: DeploymentStatus,
+) -> Result<(), anyhow::Error> {
+    let res = http()
+        .await
+        .post(format!(
+            "https://api.github.com/repos/{}/{}/deployments/{}/statuses",
+            owner, repo, deployment_id
+        ))
+        .json(&UpdateStatusRequestBody { state: status })
+        .header(header::USER_AGENT, "pipedream")
+        .header(header::ACCEPT, "application/vnd.github+json")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(GITHUB_API_VERSION_HEADER, GITHUB_API_VERSION)
+        .send()
+        .await
+        .context("updating deployment status")?;
+
+    let status = res.status();
     let text = res
         .text()
         .await
         .unwrap_or_else(|_| "no error message".to_string());
 
-    log::info!(
-        "deployment created, status={}, text={}",
-        status.clone().as_u16(),
-        text
-    );
-
-    if status != StatusCode::ACCEPTED && status != StatusCode::CREATED {
-        return Err(anyhow::anyhow!("failed to dispatch github workflow"));
+    if status != StatusCode::CREATED {
+        log::info!(
+            "failed to update deployment status for {owner}, {repo}, {deployment_id}, status={}, text={text}",
+            status.clone().as_u16()
+        );
+        return Err(anyhow::anyhow!("failed to update github deployment status"));
     }
 
     Ok(())

@@ -1,3 +1,5 @@
+use self::github::WorkflowStatus;
+
 use super::EnvironmentStatus;
 use anyhow::Context;
 use chrono::Utc;
@@ -18,17 +20,48 @@ pub async fn process_workflows(client: &'static super::Client) -> Result<(), any
     Ok(())
 }
 
+impl From<WorkflowStatus> for EnvironmentStatus {
+    fn from(status: WorkflowStatus) -> Self {
+        match status {
+            WorkflowStatus::Completed => EnvironmentStatus::Success,
+            WorkflowStatus::ActionRequired => EnvironmentStatus::Failure,
+            WorkflowStatus::Cancelled => EnvironmentStatus::Failure,
+            WorkflowStatus::Failure => EnvironmentStatus::Failure,
+            WorkflowStatus::Neutral => EnvironmentStatus::Failure,
+            WorkflowStatus::Skipped => EnvironmentStatus::Failure,
+            WorkflowStatus::Stale => EnvironmentStatus::Failure,
+            WorkflowStatus::Success => EnvironmentStatus::Success,
+            WorkflowStatus::TimedOut => EnvironmentStatus::Failure,
+            WorkflowStatus::InProgress => EnvironmentStatus::Running,
+            WorkflowStatus::Queued => EnvironmentStatus::Queued,
+            WorkflowStatus::Requested => EnvironmentStatus::Queued,
+            WorkflowStatus::Waiting => EnvironmentStatus::Queued,
+            WorkflowStatus::Pending => EnvironmentStatus::Queued,
+        }
+    }
+}
+
+fn overall_status(workflows: Vec<github::Workflow>) -> EnvironmentStatus {
+    workflows
+        .into_iter()
+        .map(|w| w.status.into())
+        .min()
+        .unwrap_or(EnvironmentStatus::Running)
+}
+
 async fn process_workflow(
     client: &'static super::Client,
     workflow: super::Workflow,
 ) -> Result<(), anyhow::Error> {
     match workflow.next_environment() {
         None => {
-            // Nothing to do, mark the workflow as done. To do this,
+            // Nothing left to do, mark the workflow as done. To do this,
             // find the last environment with a status of Success or Failure, and use that as the status.
-            let w = workflow.environments.iter().rev().find(|w| {
-                w.status == EnvironmentStatus::Success || w.status == EnvironmentStatus::Failure
-            });
+            let w = workflow
+                .environments
+                .iter()
+                .rev()
+                .find(|w| w.status.is_terminal());
             let status = w.map(|w| w.status).unwrap_or(EnvironmentStatus::Success);
             client.mark_workflow_done(workflow, status.into()).await
         }
@@ -56,12 +89,88 @@ async fn process_workflow(
                     &workflow.sha
                 );
 
+                // If there are no workflows a couple of minutes after it triggered, then
+                // yolo it as done
+                if let Some(started_at) = w.started_at {
+                    if github_workflows.is_empty()
+                        && started_at + chrono::Duration::minutes(5) < Utc::now()
+                    {
+                        log::info!(
+                            "no workflows found for commit sha {} after 5 minutes, marking as done",
+                            &workflow.sha
+                        );
+                        let mut environments = workflow.environments.clone();
+                        if let Some(environment) = environments.get_mut(idx) {
+                            environment.status = EnvironmentStatus::Success;
+                            environment.finished_at = Some(Utc::now());
+                        }
+                        let next_due_to_run = Utc::now()
+                            + chrono::Duration::minutes(workflow.stability_period_minutes as i64);
+
+                        client
+                            .complete_environment(workflow, environments, next_due_to_run)
+                            .await
+                            .context("completing environment")?;
+                        return Ok(());
+                    }
+                }
+
+                let status = overall_status(github_workflows);
+                log::info!("step is {:?} for commit sha {}", status, &workflow.sha);
+
+                let mut environments = workflow.environments.clone();
+                if let Some(environment) = environments.get_mut(idx) {
+                    environment.status = status;
+
+                    let next_due_to_run = if status.is_terminal() {
+                        environment.finished_at = Some(Utc::now());
+                        let next_due_to_run = Utc::now()
+                            + chrono::Duration::minutes(workflow.stability_period_minutes as i64);
+                        log::info!(
+                            "environment {} finished, marking workflow as done, and next due at {:?}",
+                            w.name,
+                            next_due_to_run
+                        );
+
+                        next_due_to_run
+                    } else {
+                        workflow.due_to_run
+                    };
+
+                    let deployment_id = environment.deployment_id.unwrap();
+                    let workflow = match status {
+                        EnvironmentStatus::Success => client
+                            .complete_environment(workflow, environments, next_due_to_run)
+                            .await
+                            .context("completing environment")?,
+                        EnvironmentStatus::Failure => client
+                            .fail_environment(workflow, environments, next_due_to_run)
+                            .await
+                            .context("failing environment")?,
+                        EnvironmentStatus::Running | EnvironmentStatus::Queued => client
+                            .update_environments(workflow, environments)
+                            .await
+                            .context("updating step status")?,
+                        _ => unreachable!(),
+                    };
+
+                    github::update_deployment_status(
+                        &token,
+                        &workflow.owner,
+                        &workflow.repo,
+                        &deployment_id,
+                        status.into(),
+                    )
+                    .await
+                    .context("updating deployment status")?;
+                }
+
                 return Ok(());
             };
 
             log::info!("picked up environment {} to process", w.name);
 
-            github::create_deployment(
+            let deployment = github::create_deployment(
                 &token,
                 github::CreateDeploymentRequest {
                     owner: &workflow.owner,
@@ -80,6 +189,8 @@ async fn process_workflow(
             let mut environments = workflow.environments.clone();
             if let Some(environment) = environments.get_mut(idx) {
                 environment.status = EnvironmentStatus::Running;
+                environment.started_at = Some(Utc::now());
+                environment.deployment_id = Some(deployment.id);
             }
 
             client

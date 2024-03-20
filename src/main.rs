@@ -25,7 +25,7 @@ async fn main() {
             if let Err(e) = workflow::process_workflows(client).await {
                 log::error!("error processing workflows: {0:#}", e);
             }
-            sleep(Duration::from_secs(10)).await
+            sleep(Duration::from_secs(5)).await
         }
     });
 

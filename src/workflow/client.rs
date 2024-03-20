@@ -30,6 +30,7 @@ impl Client {
                 status: EnvironmentStatus::Pending,
                 started_at: None,
                 finished_at: None,
+                deployment_id: None,
             })
             .collect::<Vec<_>>();
         self.table
@@ -89,6 +90,62 @@ impl Client {
             .context("get due to run")
     }
 
+    pub(crate) async fn fail_environment(
+        &self,
+        w: Workflow,
+        environments: Vec<Environment>,
+        due_to_run: DateTime<Utc>,
+    ) -> Result<Workflow, anyhow::Error> {
+        self.table
+            .run_update(
+                self.table
+                    .update()
+                    .key("id", to_attribute_value(w.id)?)
+                    .key("created_at", to_attribute_value(w.created_at.to_rfc3339())?)
+                    .update_expression("SET #environments = :environments, #due_to_run = :due_to_run, #updated_at = :updated_at, #status = :status")
+                    .condition_expression("attribute_exists(#id) and attribute_exists(#created_at)")
+                    .expression_attribute_names("#environments", "environments")
+                    .expression_attribute_names("#due_to_run", "due_to_run")
+                    .expression_attribute_names("#updated_at", "updated_at")
+                    .expression_attribute_names("#id", "id")
+                    .expression_attribute_names("#created_at", "created_at")
+                    .expression_attribute_names("#status", "status")
+                    .expression_attribute_values(":due_to_run", to_attribute_value(due_to_run)?)
+                    .expression_attribute_values(":environments", to_attribute_value(environments)?)
+                    .expression_attribute_values(":updated_at", to_attribute_value(Utc::now())?)
+                    .expression_attribute_values(":status", to_attribute_value(Status::Failure)?),
+            )
+            .await
+            .context("failing environment")
+    }
+
+    pub(crate) async fn complete_environment(
+        &self,
+        w: Workflow,
+        environments: Vec<Environment>,
+        due_to_run: DateTime<Utc>,
+    ) -> Result<Workflow, anyhow::Error> {
+        self.table
+            .run_update(
+                self.table
+                    .update()
+                    .key("id", to_attribute_value(w.id)?)
+                    .key("created_at", to_attribute_value(w.created_at.to_rfc3339())?)
+                    .update_expression("SET #environments = :environments, #due_to_run = :due_to_run, #updated_at = :updated_at")
+                    .condition_expression("attribute_exists(#id) and attribute_exists(#created_at)")
+                    .expression_attribute_names("#environments", "environments")
+                    .expression_attribute_names("#due_to_run", "due_to_run")
+                    .expression_attribute_names("#updated_at", "updated_at")
+                    .expression_attribute_names("#id", "id")
+                    .expression_attribute_names("#created_at", "created_at")
+                    .expression_attribute_values(":due_to_run", to_attribute_value(due_to_run)?)
+                    .expression_attribute_values(":environments", to_attribute_value(environments)?)
+                    .expression_attribute_values(":updated_at", to_attribute_value(Utc::now())?),
+            )
+            .await
+            .context("completing environment")
+    }
+
     pub(crate) async fn mark_workflow_done(
         &self,
         w: Workflow,
@@ -101,13 +158,16 @@ impl Client {
                     .key("id", to_attribute_value(w.id)?)
                     .key("created_at", to_attribute_value(w.created_at.to_rfc3339())?)
                     .update_expression("SET #status = :status, #updated_at = :updated_at")
-                    .condition_expression("attribute_exists(id) and attribute_exists(created_at)")
+                    .condition_expression("attribute_exists(#id) and attribute_exists(#created_at)")
                     .expression_attribute_names("#status", "status")
                     .expression_attribute_names("#updated_at", "updated_at")
+                    .expression_attribute_names("#id", "id")
+                    .expression_attribute_names("#created_at", "created_at")
                     .expression_attribute_values(":status", to_attribute_value(status)?)
                     .expression_attribute_values(":updated_at", to_attribute_value(Utc::now())?),
             )
-            .await?;
+            .await
+            .context("marking workflow done")?;
 
         Ok(())
     }
@@ -141,7 +201,8 @@ impl Client {
                     .expression_attribute_values(":environments", to_attribute_value(environments)?)
                     .expression_attribute_values(":updated_at", to_attribute_value(Utc::now())?),
             )
-            .await?)
+            .await
+            .context("updating environments")?)
     }
 }
 

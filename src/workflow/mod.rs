@@ -34,12 +34,22 @@ impl Display for Status {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq, Ord, PartialOrd)]
 pub enum EnvironmentStatus {
+    Failure,
     Pending,
     Running,
     Success,
-    Failure,
+    Queued,
+}
+
+impl EnvironmentStatus {
+    pub fn is_terminal(&self) -> bool {
+        match self {
+            EnvironmentStatus::Failure | EnvironmentStatus::Success => true,
+            _ => false,
+        }
+    }
 }
 
 impl From<EnvironmentStatus> for Status {
@@ -47,6 +57,7 @@ impl From<EnvironmentStatus> for Status {
         match val {
             EnvironmentStatus::Pending => Status::Running,
             EnvironmentStatus::Running => Status::Running,
+            EnvironmentStatus::Queued => Status::Running,
             EnvironmentStatus::Success => Status::Success,
             EnvironmentStatus::Failure => Status::Failure,
         }
@@ -59,6 +70,7 @@ pub struct Environment {
     pub status: EnvironmentStatus,
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
+    pub deployment_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -103,11 +115,12 @@ pub struct Workflow {
 
 impl Workflow {
     pub fn next_environment(&self) -> Option<(usize, &Environment)> {
-        let idx = self.environments.iter().position(|w| {
-            w.status == EnvironmentStatus::Running || w.status == EnvironmentStatus::Pending
-        });
+        let idx = self
+            .environments
+            .iter()
+            .position(|w| !w.status.is_terminal());
 
-        idx.and_then(|idx| self.environments.get(idx).map(|w| (idx, w)))
+        idx.map(|i| (i, &self.environments[i]))
     }
 }
 
