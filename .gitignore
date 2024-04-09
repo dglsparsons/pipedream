@@ -15,3 +15,6 @@ playwright/.cache/
 
 # Ignore private key files
 *.pem
+
+# Ignore env file
+.env

@@ -33,6 +33,7 @@ chrono = { version = "0.4.31", features = ["serde"] }
 aws-config = { version = "1.1", optional = true }
 reqwest = { version = "0.11.22", features = ["json"], optional = true }
 jsonwebtoken = { version = "9.2.0", optional = true }
+dotenvy = { version = "0.15.7", optional = true }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
@@ -52,6 +53,7 @@ ssr = [
     "dep:aws-config",
     "dep:reqwest",
     "jsonwebtoken",
+    "dotenvy"
 ]
 
 # Defines a size-optimized profile for the WASM bundle in release mode
