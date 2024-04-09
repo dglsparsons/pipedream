@@ -5,6 +5,7 @@ mod aws;
 pub mod error_template;
 #[cfg(feature = "ssr")]
 pub mod fileserv;
+mod pages;
 pub mod workflow;
 
 cfg_if! { if #[cfg(feature = "hydrate")] {
