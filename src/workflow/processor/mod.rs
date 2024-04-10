@@ -1,10 +1,8 @@
-use self::github::WorkflowStatus;
+use crate::github;
 
 use super::EnvironmentStatus;
 use anyhow::Context;
 use chrono::Utc;
-
-mod github;
 
 pub async fn process_workflows(client: &'static super::Client) -> Result<(), anyhow::Error> {
     let workflows = client.get_due_to_run(Utc::now()).await?;
@@ -20,23 +18,23 @@ pub async fn process_workflows(client: &'static super::Client) -> Result<(), any
     Ok(())
 }
 
-impl From<WorkflowStatus> for EnvironmentStatus {
-    fn from(status: WorkflowStatus) -> Self {
+impl From<github::WorkflowStatus> for EnvironmentStatus {
+    fn from(status: github::WorkflowStatus) -> Self {
         match status {
-            WorkflowStatus::Completed => EnvironmentStatus::Success,
-            WorkflowStatus::ActionRequired => EnvironmentStatus::Failure,
-            WorkflowStatus::Cancelled => EnvironmentStatus::Failure,
-            WorkflowStatus::Failure => EnvironmentStatus::Failure,
-            WorkflowStatus::Neutral => EnvironmentStatus::Failure,
-            WorkflowStatus::Skipped => EnvironmentStatus::Failure,
-            WorkflowStatus::Stale => EnvironmentStatus::Failure,
-            WorkflowStatus::Success => EnvironmentStatus::Success,
-            WorkflowStatus::TimedOut => EnvironmentStatus::Failure,
-            WorkflowStatus::InProgress => EnvironmentStatus::Running,
-            WorkflowStatus::Queued => EnvironmentStatus::Queued,
-            WorkflowStatus::Requested => EnvironmentStatus::Queued,
-            WorkflowStatus::Waiting => EnvironmentStatus::Queued,
-            WorkflowStatus::Pending => EnvironmentStatus::Queued,
+            github::WorkflowStatus::Completed => EnvironmentStatus::Success,
+            github::WorkflowStatus::ActionRequired => EnvironmentStatus::Failure,
+            github::WorkflowStatus::Cancelled => EnvironmentStatus::Failure,
+            github::WorkflowStatus::Failure => EnvironmentStatus::Failure,
+            github::WorkflowStatus::Neutral => EnvironmentStatus::Failure,
+            github::WorkflowStatus::Skipped => EnvironmentStatus::Failure,
+            github::WorkflowStatus::Stale => EnvironmentStatus::Failure,
+            github::WorkflowStatus::Success => EnvironmentStatus::Success,
+            github::WorkflowStatus::TimedOut => EnvironmentStatus::Failure,
+            github::WorkflowStatus::InProgress => EnvironmentStatus::Running,
+            github::WorkflowStatus::Queued => EnvironmentStatus::Queued,
+            github::WorkflowStatus::Requested => EnvironmentStatus::Queued,
+            github::WorkflowStatus::Waiting => EnvironmentStatus::Queued,
+            github::WorkflowStatus::Pending => EnvironmentStatus::Queued,
         }
     }
 }

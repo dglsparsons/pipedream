@@ -5,6 +5,8 @@ mod aws;
 pub mod error_template;
 #[cfg(feature = "ssr")]
 pub mod fileserv;
+#[cfg(feature = "ssr")]
+pub(crate) mod github;
 mod pages;
 pub mod workflow;
 

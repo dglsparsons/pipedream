@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use anyhow::Context;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use reqwest::{header, Client, StatusCode};
@@ -59,7 +58,7 @@ async fn generate_jwt() -> Result<String, anyhow::Error> {
         &Header::new(Algorithm::RS256),
         &my_claims,
         &EncodingKey::from_rsa_pem(include_bytes!(
-            "../../../../pipedream-ci.2024-03-01.private-key.pem"
+            "../../pipedream-ci.2024-03-01.private-key.pem"
         ))
         .context("creating encoding key from RSA pem")?,
     )
@@ -371,4 +370,56 @@ pub async fn update_deployment_status(
     }
 
     Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OauthTokenResponse {
+    pub access_token: String,
+    pub expires_in: i64, // number of seconds until expiration
+    pub refresh_token: String,
+    pub refresh_token_expires_in: u64,
+    pub scope: String,
+    pub token_type: String,
+}
+
+pub async fn exchange_oauth_token(code: &str) -> Result<OauthTokenResponse, anyhow::Error> {
+    let client_id = std::env::var("GITHUB_CLIENT_ID").unwrap();
+    let client_secret = std::env::var("GITHUB_CLIENT_SECRET").unwrap();
+    let res = http()
+        .await
+        .post("https://github.com/login/oauth/access_token")
+        .form(&[
+            ("client_id", client_id),
+            ("client_secret", client_secret),
+            ("code", code.to_owned()),
+        ])
+        .header(header::USER_AGENT, "pipedream")
+        .header(header::ACCEPT, "application/json")
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(GITHUB_API_VERSION_HEADER, GITHUB_API_VERSION)
+        .send()
+        .await
+        .context("exchanging oauth token")?;
+
+    let status = res.status();
+    if status != StatusCode::OK {
+        let text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "no error message".to_string());
+
+        log::info!(
+            "failed to exchange oauth token, status={}, text={}",
+            status.clone().as_u16(),
+            text
+        );
+        return Err(anyhow::anyhow!("failed to exchange oauth token"));
+    }
+
+    let response = res
+        .json::<OauthTokenResponse>()
+        .await
+        .context("parsing github access_token response")?;
+
+    Ok(response)
 }
