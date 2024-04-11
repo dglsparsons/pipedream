@@ -32,7 +32,7 @@ pub async fn list_repos() -> Result<Vec<String>, ServerFnError> {
     let response = expect_context::<leptos_axum::ResponseOptions>();
     let jar: axum_extra::extract::CookieJar = extract().await?;
 
-    // TODO - refresh tokens, expried access tokens... :shrug:
+    // TODO - refresh tokens, expired access tokens... :shrug:
     let access_token = match jar.get("access") {
         Some(v) => v,
         None => {
