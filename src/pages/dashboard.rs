@@ -183,7 +183,9 @@ pub fn Dashboard() -> impl IntoView {
                     move || repos.get().map(|repos| match repos {
                       Ok(repos) => {
                           view! {
-                            <select on:change=move |ev| {
+                            <select
+                                class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                on:change=move |ev| {
                               let new_value = event_target_value(&ev);
                               set_repo(new_value);
                             }>
