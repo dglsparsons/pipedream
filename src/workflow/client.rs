@@ -57,6 +57,7 @@ impl Client {
             .run_query(
                 self.table
                     .query()
+                    .scan_index_forward(false)
                     .key_condition_expression("#id = :id")
                     .expression_attribute_names("#id", "id")
                     .expression_attribute_values(":id", to_attribute_value(owner + "/" + &repo)?),
