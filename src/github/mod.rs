@@ -1,10 +1,13 @@
 use anyhow::Context;
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use reqwest::{header, Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 
 use crate::workflow::EnvironmentStatus;
+
+mod token_cache;
+
+use token_cache::token_cache;
 
 async fn new_client() -> Client {
     Client::new()
@@ -32,132 +35,8 @@ struct CreateDeploymentRequestBody<'a> {
     required_contexts: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    iat: i64,
-    exp: i64,
-    iss: &'static str,
-    alg: &'static str,
-}
-
-const GITHUB_APP_ID: &str = "673610";
-const ALG: &str = "RSA256";
 const GITHUB_API_VERSION_HEADER: &str = "X-GitHub-Api-Version";
 const GITHUB_API_VERSION: &str = "2022-11-28";
-
-async fn generate_jwt() -> Result<String, anyhow::Error> {
-    let iat = chrono::Utc::now() - chrono::Duration::seconds(60);
-    let exp = iat + chrono::Duration::minutes(10);
-    let my_claims = Claims {
-        iat: iat.timestamp(),
-        exp: exp.timestamp(),
-        iss: GITHUB_APP_ID,
-        alg: ALG,
-    };
-    let token = encode(
-        &Header::new(Algorithm::RS256),
-        &my_claims,
-        &EncodingKey::from_rsa_pem(include_bytes!(
-            "../../pipedream-ci.2024-03-01.private-key.pem"
-        ))
-        .context("creating encoding key from RSA pem")?,
-    )
-    .context("encoding JWT token")?;
-    Ok(token)
-}
-
-#[derive(Debug, Deserialize)]
-struct Installation {
-    id: i64,
-}
-
-#[derive(Debug, Deserialize)]
-struct InstallationAccessToken {
-    token: String,
-    expires_at: chrono::DateTime<chrono::Utc>,
-}
-
-pub async fn create_access_token(org: String, repo: String) -> Result<String, anyhow::Error> {
-    let token = generate_jwt().await?;
-
-    let res = http()
-        .await
-        .get(format!(
-            "https://api.github.com/repos/{}/{}/installation",
-            org, repo
-        ))
-        .header(header::USER_AGENT, "pipedream")
-        .header(header::ACCEPT, "application/vnd.github+json")
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
-        .header(GITHUB_API_VERSION_HEADER, GITHUB_API_VERSION)
-        .send()
-        .await
-        .context("getting github installation id")?;
-
-    let status = res.status();
-
-    if status != StatusCode::OK {
-        let text = res
-            .text()
-            .await
-            .unwrap_or_else(|_| "no error message".to_string());
-
-        log::info!(
-            "get github installation id, status={}, text={}",
-            status.clone().as_u16(),
-            text
-        );
-        return Err(anyhow::anyhow!("failed to get github installation id"));
-    }
-
-    let installation: Installation = res
-        .json()
-        .await
-        .context("parsing github installation id response")?;
-
-    let res = http()
-        .await
-        .post(format!(
-            "https://api.github.com/app/installations/{}/access_tokens",
-            installation.id
-        ))
-        .header(header::USER_AGENT, "pipedream")
-        .header(header::ACCEPT, "application/vnd.github+json")
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
-        .header(GITHUB_API_VERSION_HEADER, GITHUB_API_VERSION)
-        .send()
-        .await
-        .context("creating github installation access token")?;
-
-    let status = res.status();
-
-    if status != StatusCode::CREATED {
-        let text = res
-            .text()
-            .await
-            .unwrap_or_else(|_| "no error message".to_string());
-
-        log::info!(
-            "creating github installation access token, status={}, text={}",
-            status.clone().as_u16(),
-            text
-        );
-        return Err(anyhow::anyhow!("failed to get github installation id"));
-    }
-
-    let access_token: InstallationAccessToken = res
-        .json()
-        .await
-        .context("parsing github installation access token response")?;
-
-    log::info!(
-        "created github installation access token, access_token={}, expires_at={}",
-        access_token.token,
-        access_token.expires_at,
-    );
-
-    return Ok(access_token.token);
-}
 
 // Github actions has way too many statuses, holy crap.
 #[derive(Debug, Deserialize)]
@@ -204,17 +83,24 @@ pub struct Workflow {
 
 #[derive(Debug, Deserialize)]
 struct ListWorkflowResponse {
+    #[allow(dead_code)]
     total_count: i64,
     workflow_runs: Vec<Workflow>,
 }
 
+async fn get_token(owner: &str, repo: &str) -> Result<String, anyhow::Error> {
+    let tc = token_cache();
+    let mut tc = tc.lock().await;
+    tc.get_or_create(owner, repo).await.context("getting token")
+}
+
 pub async fn list_workflows(
-    token: &str,
     owner: &str,
     repo: &str,
     sha: &str,
     event: &str,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
+    let token = get_token(owner, repo).await?;
     let res = http()
         .await
         .get(format!(
@@ -257,9 +143,9 @@ pub struct CreateDeploymentResponse {
 }
 
 pub async fn create_deployment(
-    token: &str,
     req: CreateDeploymentRequest<'_>,
 ) -> Result<CreateDeploymentResponse, anyhow::Error> {
+    let token = get_token(req.owner, req.repo).await?;
     let res = http()
         .await
         .post(format!(
@@ -334,12 +220,12 @@ struct UpdateStatusRequestBody {
 }
 
 pub async fn update_deployment_status(
-    token: &str,
     owner: &str,
     repo: &str,
     deployment_id: &u64,
     status: DeploymentStatus,
 ) -> Result<(), anyhow::Error> {
+    let token = get_token(owner, repo).await?;
     let res = http()
         .await
         .post(format!(
@@ -373,6 +259,20 @@ pub async fn update_deployment_status(
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum OAuthResponse {
+    Success(OauthTokenResponse),
+    Error(OAuthErrorResponse),
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct OAuthErrorResponse {
+    error: String,
+    error_description: String,
+    error_uri: String,
+}
+
+#[derive(Debug, Deserialize, Default)]
 pub struct OauthTokenResponse {
     pub access_token: String,
     pub expires_in: i64, // number of seconds until expiration
@@ -417,9 +317,135 @@ pub async fn exchange_oauth_token(code: &str) -> Result<OauthTokenResponse, anyh
     }
 
     let response = res
-        .json::<OauthTokenResponse>()
+        .json::<OAuthResponse>()
         .await
         .context("parsing github access_token response")?;
 
-    Ok(response)
+    Ok(match response {
+        OAuthResponse::Success(token) => Ok(token),
+        OAuthResponse::Error(e) => Err(anyhow::anyhow!(
+            "failed to exchange oauth token: {} - {:#}: {}",
+            e.error,
+            e.error_description,
+            e.error_uri,
+        )),
+    }?)
+}
+
+#[derive(Debug, Deserialize)]
+struct Repository {
+    full_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ListRespositoriesResponse {
+    #[allow(dead_code)]
+    total_count: i64,
+    repositories: Vec<Repository>,
+}
+
+pub async fn list_installation_repositories(
+    token: &str,
+    installation_id: i64,
+) -> Result<Vec<String>, anyhow::Error> {
+    let res = http()
+        .await
+        .get(format!(
+            "https://api.github.com/user/installations/{}/repositories",
+            installation_id
+        ))
+        .query(&[("per_page", "100")])
+        .header(header::USER_AGENT, "pipedream")
+        .header(header::ACCEPT, "application/vnd.github+json")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(GITHUB_API_VERSION_HEADER, GITHUB_API_VERSION)
+        .send()
+        .await
+        .context("listing installation repositories")?;
+
+    let status = res.status();
+    if status != StatusCode::OK {
+        let text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "no error message".to_string());
+
+        log::info!(
+            "failed to list installation repositories, status={}, text={}",
+            status.clone().as_u16(),
+            text
+        );
+        return Err(anyhow::anyhow!("failed to list installition repositories"));
+    }
+
+    let response = res
+        .json::<ListRespositoriesResponse>()
+        .await
+        .context("parsing github list repositories response")?;
+
+    log::info!("found repositories: {:?}", response);
+
+    Ok(response
+        .repositories
+        .into_iter()
+        .map(|r| r.full_name)
+        .collect())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct InstallationAccount {
+    #[allow(dead_code)]
+    id: i64,
+    pub login: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Installation {
+    pub id: i64,
+    pub account: InstallationAccount,
+}
+
+#[derive(Debug, Deserialize)]
+struct UserInstallationResponse {
+    #[allow(dead_code)]
+    total_count: i64,
+    installations: Vec<Installation>,
+}
+
+pub async fn list_user_installations(token: &str) -> Result<Vec<Installation>, anyhow::Error> {
+    let res = http()
+        .await
+        .get("https://api.github.com/user/installations")
+        .query(&[("per_page", "100")])
+        .header(header::USER_AGENT, "pipedream")
+        .header(header::ACCEPT, "application/vnd.github+json")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(GITHUB_API_VERSION_HEADER, GITHUB_API_VERSION)
+        .send()
+        .await
+        .context("listing user installations")?;
+
+    let status = res.status();
+    if status != StatusCode::OK {
+        let text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "no error message".to_string());
+
+        log::info!(
+            "failed to list installation repositories, status={}, text={}",
+            status.clone().as_u16(),
+            text
+        );
+        return Err(anyhow::anyhow!("failed to list installition repositories"));
+    }
+
+    let response = res
+        .json::<UserInstallationResponse>()
+        .await
+        .context("parsing github list repositories response")?;
+
+    log::info!("found {} installations", response.total_count);
+
+    Ok(response.installations)
 }

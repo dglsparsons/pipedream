@@ -1,5 +1,6 @@
-mod github_callback;
+mod components;
+mod dashboard;
 mod home;
 
-pub use github_callback::*;
+pub use dashboard::*;
 pub use home::*;

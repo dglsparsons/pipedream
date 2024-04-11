@@ -1,6 +1,5 @@
-use super::workflow;
 use crate::error_template::{AppError, ErrorTemplate};
-use crate::pages::*;
+use crate::pages;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -22,8 +21,8 @@ pub fn App() -> impl IntoView {
         }>
             <main>
                 <Routes>
-                    <Route path="" view=HomePage/>
-                    <Route path="github/callback" view=GithubCallbackPage/>
+                    <Route path="" view=pages::Home/>
+                    <Route path="dashboard" view=pages::Dashboard/>
                 </Routes>
             </main>
         </Router>
@@ -45,6 +44,7 @@ pub async fn create_workflow(
     environments: String,
     commit_message: String,
 ) -> Result<Response, ServerFnError> {
+    use super::workflow;
     let environments = environments
         .split(',')
         .map(|s| s.to_string())
@@ -66,4 +66,53 @@ pub async fn create_workflow(
     Ok(Response {
         url: format!("https://pipedream.fly.dev/{}/{}/{}", owner, repo, sha),
     })
+}
+
+#[server(Authorize, "/api", "GetJson", "github/callback")]
+pub async fn authorize(code: String) -> Result<(), ServerFnError> {
+    use crate::github;
+    use axum_extra::extract::cookie::{Cookie, SameSite};
+    use http::header;
+    use leptos::expect_context;
+    use leptos_axum::ResponseOptions;
+    use time::Duration;
+
+    let response = expect_context::<ResponseOptions>();
+
+    let auth_tokens = match github::exchange_oauth_token(&code).await {
+        Err(e) => {
+            log::error!("failed to exchange oauth token: {:#}", e);
+            leptos_axum::redirect("/");
+            Err(ServerFnError::new("unable to list workflows"))
+        }
+        Ok(v) => Ok(v),
+    }?;
+
+    let cookie = Cookie::build(("access", auth_tokens.access_token))
+        .domain("127.0.0.1")
+        .path("/")
+        .secure(true)
+        .same_site(SameSite::Strict)
+        .max_age(Duration::new(auth_tokens.expires_in - 30, 0))
+        .http_only(true);
+
+    if let Ok(cookie) = header::HeaderValue::from_str(&cookie.to_string()) {
+        response.append_header(header::SET_COOKIE, cookie);
+    }
+
+    let cookie = Cookie::build(("refresh", auth_tokens.refresh_token))
+        .domain("127.0.0.1")
+        .path("/")
+        .secure(true)
+        .same_site(SameSite::Strict)
+        .max_age(Duration::days(10))
+        .http_only(true);
+
+    if let Ok(cookie) = header::HeaderValue::from_str(&cookie.to_string()) {
+        response.append_header(header::SET_COOKIE, cookie);
+    }
+
+    leptos_axum::redirect("/dashboard");
+
+    Ok(())
 }

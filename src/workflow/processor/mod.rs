@@ -64,15 +64,9 @@ async fn process_workflow(
             client.mark_workflow_done(workflow, status.into()).await
         }
         Some((idx, w)) => {
-            let token =
-                github::create_access_token(workflow.owner.to_string(), workflow.repo.to_string())
-                    .await
-                    .context("creating access token")?;
-
             if w.status == EnvironmentStatus::Running {
                 // it's running, we need to check the status of the workflows.
                 let github_workflows = github::list_workflows(
-                    &token,
                     &workflow.owner,
                     &workflow.repo,
                     &workflow.sha,
@@ -153,7 +147,6 @@ async fn process_workflow(
                     };
 
                     github::update_deployment_status(
-                        &token,
                         &workflow.owner,
                         &workflow.repo,
                         &deployment_id,
@@ -168,16 +161,13 @@ async fn process_workflow(
 
             log::info!("picked up environment {} to process", w.name);
 
-            let deployment = github::create_deployment(
-                &token,
-                github::CreateDeploymentRequest {
-                    owner: &workflow.owner,
-                    repo: &workflow.repo,
-                    environment: &w.name,
-                    git_ref: &workflow.sha,
-                    description: "created by pipedream",
-                },
-            )
+            let deployment = github::create_deployment(github::CreateDeploymentRequest {
+                owner: &workflow.owner,
+                repo: &workflow.repo,
+                environment: &w.name,
+                git_ref: &workflow.sha,
+                description: "created by pipedream",
+            })
             .await
             .context("running github workflow")?;
 
