@@ -383,8 +383,6 @@ pub async fn list_installation_repositories(
         .await
         .context("parsing github list repositories response")?;
 
-    log::info!("found repositories: {:?}", response);
-
     Ok(response
         .repositories
         .into_iter()

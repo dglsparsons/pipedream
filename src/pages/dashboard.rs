@@ -172,6 +172,20 @@ pub fn Dashboard() -> impl IntoView {
     let (repo, set_repo) = create_signal("".to_string());
     let repos = create_local_resource(move || (), |_| list_repos());
 
+    create_effect(move |_| {
+        if repo.get().is_empty() {
+            set_repo(
+                repos
+                    .get()
+                    .map(|r| r.ok())
+                    .flatten()
+                    .map(|r| r.get(0).cloned())
+                    .flatten()
+                    .unwrap_or_default(),
+            );
+        }
+    });
+
     view! {
         <div class="min-h-screen bg-gray-100 dark:bg-gray-800 dark:text-white">
           <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
