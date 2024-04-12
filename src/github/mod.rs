@@ -443,7 +443,5 @@ pub async fn list_user_installations(token: &str) -> Result<Vec<Installation>, a
         .await
         .context("parsing github list repositories response")?;
 
-    log::info!("found {} installations", response.total_count);
-
     Ok(response.installations)
 }
