@@ -191,7 +191,9 @@ pub fn Dashboard() -> impl IntoView {
           <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
             <div class="flex items-center">
               <Transition
-                  fallback=move || view! { <select>"Loading..."</select> }
+                  fallback=move || view! { <select
+                                class="min-w-[100px] flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >"Loading..."</select> }
               >
                   {
                     move || repos.get().map(|repos| match repos {

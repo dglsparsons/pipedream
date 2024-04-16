@@ -49,6 +49,9 @@ pub async fn create_workflow(
         .split(',')
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
+
+    // TODO - validate that the app is installed and has access to this repo.
+
     workflow::client()
         .await
         .create(workflow::CreateWorkflowRequest {
