@@ -6,6 +6,17 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[lints.clippy]
+unused_async = "warn"
+needless_question_mark = "warn"
+map_flatten = "warn"
+get_first = "warn"
+redundant_closure = "warn"
+needless_return = "warn"
+implicit_clone = "warn"
+explicit_into_iter_loop = "warn"
+matches_like_matches_macro = "warn"
+
 [dependencies]
 axum = { version = "0.7", optional = true }
 console_error_panic_hook = "0.1"
