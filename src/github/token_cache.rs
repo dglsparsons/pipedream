@@ -57,7 +57,7 @@ struct Claims {
 const GITHUB_APP_ID: &str = "673610";
 const ALG: &str = "RSA256";
 
-async fn generate_jwt() -> Result<String, anyhow::Error> {
+fn generate_jwt() -> Result<String, anyhow::Error> {
     let iat = chrono::Utc::now() - chrono::Duration::seconds(60);
     let exp = iat + chrono::Duration::minutes(10);
     let my_claims = Claims {
@@ -93,7 +93,7 @@ async fn create_access_token(
     org: String,
     repo: String,
 ) -> Result<(DateTime<Utc>, String), anyhow::Error> {
-    let token = generate_jwt().await?;
+    let token = generate_jwt()?;
 
     let res = super::http()
         .await
@@ -171,5 +171,5 @@ async fn create_access_token(
         access_token.expires_at,
     );
 
-    return Ok((access_token.expires_at, access_token.token));
+    Ok((access_token.expires_at, access_token.token))
 }

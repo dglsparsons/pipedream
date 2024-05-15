@@ -17,7 +17,7 @@ pub async fn file_and_error_handler(uri: Uri, State(options): State<LeptosOption
     if res.status() == StatusCode::OK {
         res.into_response()
     } else {
-        let handler = leptos_axum::render_app_to_stream(options.to_owned(), App);
+        let handler = leptos_axum::render_app_to_stream(options.clone(), App);
         handler(req).await.into_response()
     }
 }

@@ -46,7 +46,7 @@ pub async fn list_repos() -> Result<Vec<String>, ServerFnError> {
     let installations = github::list_user_installations(access_token.value())
         .await
         .context("listing user orgs")
-        .map_err(|e| ServerFnError::new(e))?;
+        .map_err(ServerFnError::new)?;
 
     let futures =
         installations
@@ -57,8 +57,8 @@ pub async fn list_repos() -> Result<Vec<String>, ServerFnError> {
             .collect::<Vec<_>>();
 
     let mut repos = vec![];
-    for f in futures.into_iter() {
-        let x = f.await.map_err(|e| ServerFnError::new(e))?;
+    for f in futures {
+        let x = f.await.map_err(ServerFnError::new)?;
         repos.extend(x);
     }
 
@@ -103,7 +103,7 @@ fn WorkflowCard(workflow: Workflow) -> impl IntoView {
 fn Deployments(repo: ReadSignal<String>) -> impl IntoView {
     let workflows = create_resource(repo, |repo| {
         let parts = repo.split('/').collect::<Vec<_>>();
-        let owner = parts.get(0).unwrap_or(&"").to_string();
+        let owner = parts.first().unwrap_or(&"").to_string();
         let repo = parts.get(1).unwrap_or(&"").to_string();
         list_workflows(owner, repo)
     });
@@ -177,10 +177,8 @@ pub fn Dashboard() -> impl IntoView {
             set_repo(
                 repos
                     .get()
-                    .map(|r| r.ok())
-                    .flatten()
-                    .map(|r| r.get(0).cloned())
-                    .flatten()
+                    .and_then(|r| r.ok())
+                    .and_then(|r| r.first().cloned())
                     .unwrap_or_default(),
             );
         }

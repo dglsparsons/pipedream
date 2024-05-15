@@ -321,7 +321,7 @@ pub async fn exchange_oauth_token(code: &str) -> Result<OauthTokenResponse, anyh
         .await
         .context("parsing github access_token response")?;
 
-    Ok(match response {
+    match response {
         OAuthResponse::Success(token) => Ok(token),
         OAuthResponse::Error(e) => Err(anyhow::anyhow!(
             "failed to exchange oauth token: {} - {:#}: {}",
@@ -329,7 +329,7 @@ pub async fn exchange_oauth_token(code: &str) -> Result<OauthTokenResponse, anyh
             e.error_description,
             e.error_uri,
         )),
-    }?)
+    }
 }
 
 #[derive(Debug, Deserialize)]

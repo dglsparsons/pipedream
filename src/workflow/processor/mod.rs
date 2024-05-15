@@ -12,7 +12,7 @@ pub async fn process_workflows(client: &'static super::Client) -> Result<(), any
         .map(|w| tokio::spawn(process_workflow(client, w)))
         .collect();
 
-    for f in futures.into_iter() {
+    for f in futures {
         f.await??;
     }
     Ok(())

@@ -64,7 +64,7 @@ pub async fn create_workflow(
             commit_message,
         })
         .await
-        .map_err(|e| ServerFnError::new(e))?;
+        .map_err(ServerFnError::new)?;
 
     Ok(Response {
         url: format!("https://pipedream.fly.dev/{}/{}/{}", owner, repo, sha),

@@ -15,7 +15,7 @@ redundant_closure = "warn"
 needless_return = "warn"
 implicit_clone = "warn"
 explicit_into_iter_loop = "warn"
-matches_like_matches_macro = "warn"
+match_like_matches_macro = "warn"
 
 [dependencies]
 axum = { version = "0.7", optional = true }

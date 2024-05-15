@@ -184,7 +184,7 @@ impl Client {
             w.created_at.to_rfc3339()
         );
 
-        Ok(self
+        self
             .table
             .run_update(
                 self.table
@@ -203,7 +203,7 @@ impl Client {
                     .expression_attribute_values(":updated_at", to_attribute_value(Utc::now())?),
             )
             .await
-            .context("updating environments")?)
+            .context("updating environments")
     }
 }
 

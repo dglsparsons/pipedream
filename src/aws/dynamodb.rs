@@ -58,7 +58,7 @@ impl DynamodbClient {
         key: HashMap<String, impl Serialize>,
     ) -> Result<T, DynamodbError> {
         let mut keys = HashMap::new();
-        for (k, v) in key.into_iter() {
+        for (k, v) in key {
             let value = to_attribute_value(v)
                 .with_context(|| format!("failed to marshal key to attribute value {}", k))?;
             keys.insert(k, value);

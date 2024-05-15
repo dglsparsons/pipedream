@@ -45,10 +45,10 @@ pub enum EnvironmentStatus {
 
 impl EnvironmentStatus {
     pub fn is_terminal(&self) -> bool {
-        match self {
-            EnvironmentStatus::Failure | EnvironmentStatus::Success => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            EnvironmentStatus::Failure | EnvironmentStatus::Success
+        )
     }
 }
 
