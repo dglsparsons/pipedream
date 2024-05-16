@@ -1,5 +1,6 @@
 use crate::error_template::{AppError, ErrorTemplate};
 use crate::pages;
+use http::HeaderMap;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -45,12 +46,15 @@ pub async fn create_workflow(
     commit_message: String,
 ) -> Result<Response, ServerFnError> {
     use super::workflow;
+    use leptos_axum::extract;
+
     let environments = environments
         .split(',')
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
 
-    // TODO - validate that the app is installed and has access to this repo.
+    let headers: HeaderMap = extract().await?;
+    log::info!("headers: {:#?}", headers);
 
     workflow::client()
         .await
