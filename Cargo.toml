@@ -47,6 +47,7 @@ jsonwebtoken = { version = "9.3.0", optional = true }
 dotenvy = { version = "0.15.7", optional = true }
 axum-extra = { version = "0.9.3", optional = true, features = ["cookie"] }
 time = "0.3.34"
+openssl = { version = "0.10.64", features = ["vendored"] }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
