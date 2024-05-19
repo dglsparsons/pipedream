@@ -1,4 +1,5 @@
 use anyhow::Context;
+use jsonwebtoken::{self, decode, jwk::JwkSet, Algorithm, DecodingKey, Validation};
 use reqwest::{header, Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
@@ -205,8 +206,7 @@ pub enum DeploymentStatus {
 impl From<EnvironmentStatus> for DeploymentStatus {
     fn from(status: EnvironmentStatus) -> Self {
         match status {
-            EnvironmentStatus::Pending => DeploymentStatus::Queued,
-            EnvironmentStatus::Queued => DeploymentStatus::Queued,
+            EnvironmentStatus::Pending | EnvironmentStatus::Queued => DeploymentStatus::Queued,
             EnvironmentStatus::Running => DeploymentStatus::InProgress,
             EnvironmentStatus::Success => DeploymentStatus::Success,
             EnvironmentStatus::Failure => DeploymentStatus::Failure,
@@ -444,4 +444,53 @@ pub async fn list_user_installations(token: &str) -> Result<Vec<Installation>, a
         .context("parsing github list repositories response")?;
 
     Ok(response.installations)
+}
+
+pub async fn validate_oidc_token(token: &str) -> Result<(), anyhow::Error> {
+    let res = http()
+        .await
+        .get("https://token.actions.githubusercontent.com/.well-known/jwks")
+        .header(header::USER_AGENT, "pipedream")
+        .header(header::ACCEPT, "application/json")
+        .send()
+        .await
+        .context("getting github jwks")?;
+
+    let status = res.status();
+    if status != StatusCode::OK {
+        let text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "no error message".to_string());
+
+        log::info!(
+            "failed to load github JWKs , status={}, text={}",
+            status.clone().as_u16(),
+            text
+        );
+        return Err(anyhow::anyhow!("failed to list github JWKs"));
+    }
+
+    let jwks = res
+        .json::<Vec<jsonwebtoken::jwk::Jwk>>()
+        .await
+        .context("parsing github list repositories response")?;
+
+    let jwks = JwkSet { keys: jwks };
+
+    let key = jsonwebtoken::decode_header(token)
+        .context("decoding header")
+        .and_then(|header| header.kid.ok_or_else(|| anyhow::anyhow!("missing kid")))
+        .and_then(|kid| {
+            jwks.find(&kid)
+                .ok_or_else(|| anyhow::anyhow!("no key found matching header"))
+        })
+        .and_then(|k| DecodingKey::from_jwk(k).context("getting decoding key from jwk"))?;
+
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.set_issuer(&["https://token.actions.githubusercontent.com"]);
+
+    decode::<()>(token, &key, &validation).context("decoding token")?;
+
+    Ok(())
 }

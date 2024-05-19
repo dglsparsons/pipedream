@@ -1,6 +1,5 @@
 use crate::error_template::{AppError, ErrorTemplate};
 use crate::pages;
-use http::HeaderMap;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -46,15 +45,41 @@ pub async fn create_workflow(
     commit_message: String,
 ) -> Result<Response, ServerFnError> {
     use super::workflow;
-    use leptos_axum::extract;
+    use http::{HeaderMap, StatusCode};
+    use leptos::expect_context;
+    use leptos_axum::{extract, ResponseOptions};
 
     let environments = environments
         .split(',')
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
 
+    let response = expect_context::<ResponseOptions>();
+
     let headers: HeaderMap = extract().await?;
-    log::info!("headers: {:#?}", headers);
+    let auth_header = headers.get("authorization").ok_or_else(|| {
+        response.set_status(StatusCode::UNAUTHORIZED);
+        ServerFnError::new("missing authorization header")
+    })?;
+
+    let token = auth_header.to_str().map_err(|_| {
+        response.set_status(StatusCode::BAD_REQUEST);
+        ServerFnError::new("invalid authorization header")
+    })?;
+
+    let token = if token.starts_with("Bearer ") {
+        token.trim_start_matches("Bearer ")
+    } else {
+        token
+    };
+
+    crate::github::validate_oidc_token(token)
+        .await
+        .map_err(|e| {
+            response.set_status(StatusCode::UNAUTHORIZED);
+            log::info!("failed to validate token: {:#}", e);
+            ServerFnError::new("invalid authorization token")
+        })?;
 
     workflow::client()
         .await
