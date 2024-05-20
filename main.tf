@@ -28,7 +28,7 @@ data "terraform_remote_state" "platform" {
 }
 
 locals {
-  aws_account = "doug"
+  environment = "doug"
   prefix      = "pipedream"
 }
 
@@ -36,7 +36,7 @@ provider "aws" {
   region = "eu-west-1"
 
   assume_role {
-    role_arn = "arn:aws:iam::${data.terraform_remote_state.platform.outputs.account_ids[local.aws_account]}:role/Deployer"
+    role_arn = "arn:aws:iam::${data.terraform_remote_state.platform.outputs.account_ids[local.environment]}:role/Deployer"
   }
 }
 
@@ -95,6 +95,8 @@ resource "aws_iam_policy" "workflows_dynamodb" {
   policy = data.aws_iam_policy_document.workflows_dynamodb.json
 }
 
+
+## Here on down is just for local dev
 resource "aws_iam_user" "pipedream" {
   name          = "${local.prefix}-api"
   force_destroy = true

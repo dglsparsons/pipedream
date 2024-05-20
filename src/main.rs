@@ -9,12 +9,14 @@ async fn main() {
     use pipedream::workflow;
     use tokio::time::{sleep, Duration};
 
-    let _ = dotenvy::dotenv();
+    if dotenvy::dotenv_override().is_err() {
+        // use pipedream::aws::
+        // File was not found. Load everything from parameter store as we're in AWS land.
+    }
 
     simple_logger::init_with_level(log::Level::Info).expect("couldn't initialize logging");
     let conf = get_configuration(None).await.unwrap();
     let leptos_options = conf.leptos_options;
-    let addr = leptos_options.site_addr;
     let routes = generate_route_list(App);
 
     tokio::spawn(async move {
@@ -31,16 +33,30 @@ async fn main() {
         }
     });
 
+    let addr = leptos_options.site_addr.clone();
+
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, App)
         .fallback(file_and_error_handler)
         .with_state(leptos_options);
 
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    logging::log!("listening on http://{}", &addr);
-    axum::serve(listener, app.into_make_service())
-        .await
-        .unwrap();
+    // In development, we use the Hyper server
+    #[cfg(debug_assertions)]
+    {
+        let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+        log::info!("listening on http://{}", &addr);
+        axum::serve(listener, app).await.unwrap();
+    }
+
+    // In release, we use the lambda_http crate
+    #[cfg(not(debug_assertions))]
+    {
+        let app = tower::ServiceBuilder::new()
+            .layer(axum_aws_lambda::LambdaLayer::default())
+            .service(app);
+
+        lambda_http::run(app).await.unwrap();
+    }
 }
 
 #[cfg(not(feature = "ssr"))]
