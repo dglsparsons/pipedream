@@ -49,8 +49,13 @@ axum-extra = { version = "0.9.3", optional = true, features = ["cookie"] }
 time = "0.3.34"
 openssl = { version = "0.10.64", features = ["vendored"], optional = true }
 aws-sdk-ssm = { version = "1.28.0", optional = true }
-axum-aws-lambda = { version = "0.7.0", optional = true }
 lambda_http = { version = "0.11.1", optional = true }
+tower-service = { version = "0.3.2", optional = true }
+serde_json = { version = "1.0.117", optional = true }
+lambda_runtime = { version = "0.11.2", optional = true }
+base64 = { version = "0.22.1", optional = true }
+serde_derive = { version = "1.0.202", optional = true }
+http-body-util = { version = "0.1.1", optional = true }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
@@ -70,12 +75,17 @@ ssr = [
     "dep:aws-types",
     "dep:aws-config",
     "dep:aws-sdk-ssm",
-    "dep:axum-aws-lambda",
     "dep:lambda_http",
     "dep:reqwest",
     "dep:jsonwebtoken",
     "dep:openssl",
-    "dotenvy"
+    "dep:dotenvy",
+    "dep:tower-service",
+    "dep:serde_json",
+    "dep:lambda_runtime",
+    "dep:base64",
+    "dep:serde_derive",
+    "dep:http-body-util",
 ]
 
 # Defines a size-optimized profile for the WASM bundle in release mode

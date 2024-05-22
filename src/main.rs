@@ -52,10 +52,10 @@ async fn main() {
     #[cfg(not(debug_assertions))]
     {
         let app = tower::ServiceBuilder::new()
-            .layer(axum_aws_lambda::LambdaLayer::default())
+            .layer(pipedream::vercel_axum::VercelLayer)
             .service(app);
 
-        lambda_http::run(app).await.unwrap();
+        lambda_runtime::run(app).await.unwrap();
     }
 }
 
