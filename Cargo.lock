@@ -2338,6 +2338,7 @@ dependencies = [
  "serde_derive",
  "serde_dynamo",
  "serde_json",
+ "server_fn",
  "simple_logger",
  "thiserror",
  "time",

@@ -19,6 +19,10 @@ async fn main() {
     let leptos_options = conf.leptos_options;
     let routes = generate_route_list(App);
 
+    for route in &routes {
+        log::info!("route: {:#?}", route.path());
+    }
+
     tokio::spawn(async move {
         let client = workflow::client().await;
         if std::env::var("LEPTOS_WORKER").is_err() {

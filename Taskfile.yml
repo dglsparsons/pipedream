@@ -1,0 +1,15 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - cargo leptos build
+      - LEPTOS_SITE_ROOT="." cargo lambda build --no-default-features --features=ssr --release --arm64
+      - cargo run --bin vercel
+    env:
+      LEPTOS_OUTPUT_NAME: pipedream
+    vars:
+      TARGET_DIR:
+        sh: cargo metadata --format-version 1 | jq .target_directory

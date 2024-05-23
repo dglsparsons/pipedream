@@ -56,6 +56,7 @@ lambda_runtime = { version = "0.11.2", optional = true }
 base64 = { version = "0.22.1", optional = true }
 serde_derive = { version = "1.0.202", optional = true }
 http-body-util = { version = "0.1.1", optional = true }
+server_fn = { version = "0.6", optional = true }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
@@ -86,6 +87,7 @@ ssr = [
     "dep:base64",
     "dep:serde_derive",
     "dep:http-body-util",
+    "dep:server_fn",
 ]
 
 # Defines a size-optimized profile for the WASM bundle in release mode
@@ -108,9 +110,10 @@ panic = "abort"
 [package.metadata.leptos]
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name
 output-name = "pipedream"
+bin-target = "pipedream"
 
 # The site root folder is where cargo-leptos generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.
-site-root = "target/lambda/pipedream"
+site-root = ".vercel/output/static"
 
 # The site-root relative folder where all compiled output (JS, WASM and CSS) is written
 # Defaults to pkg
