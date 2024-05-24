@@ -120,8 +120,9 @@ pub async fn authorize(code: String) -> Result<(), ServerFnError> {
         Ok(v) => Ok(v),
     }?;
 
+    let domain = std::env::var("DOMAIN").unwrap_or("127.0.0.1".to_string());
     let cookie = Cookie::build(("access", auth_tokens.access_token))
-        .domain("127.0.0.1")
+        .domain(&domain)
         .path("/")
         .secure(true)
         .same_site(SameSite::Strict)
@@ -133,7 +134,7 @@ pub async fn authorize(code: String) -> Result<(), ServerFnError> {
     }
 
     let cookie = Cookie::build(("refresh", auth_tokens.refresh_token))
-        .domain("127.0.0.1")
+        .domain(domain)
         .path("/")
         .secure(true)
         .same_site(SameSite::Strict)

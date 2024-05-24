@@ -94,11 +94,30 @@ resource "aws_dynamodb_table" "workflows" {
   }
 }
 
-resource "vercel_project_environment_variable" "dymanodb_workflows" {
+resource "vercel_project_environment_variable" "dynamodb_workflows" {
   project_id = data.terraform_remote_state.project.outputs.vercel_project_id
   key        = "DYNAMODB_WORKFLOWS"
   value      = aws_dynamodb_table.workflows.name
   target     = ["production", "preview"]
+}
+
+resource "vercel_project_environment_variable" "github_client_id" {
+  project_id = data.terraform_remote_state.project.outputs.vercel_project_id
+  key        = "GITHUB_CLIENT_ID"
+  value      = "Iv1.a37bc6120f071efe"
+  target     = ["production", "preview"]
+}
+
+data "aws_ssm_parameter" "github_client_secret" {
+  name = "/${local.prefix}/github_client_secret"
+}
+
+resource "vercel_project_environment_variable" "github_client_secret" {
+  project_id = data.terraform_remote_state.project.outputs.vercel_project_id
+  key        = "GITHUB_CLIENT_SECRET"
+  value      = data.aws_ssm_parameter.github_client_secret.value
+  target     = ["production", "preview"]
+  sensitive  = true
 }
 
 data "aws_iam_policy_document" "workflows_dynamodb" {

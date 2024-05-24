@@ -1,4 +1,5 @@
 use axum::response::IntoResponse;
+use base64::prelude::*;
 use http_body_util::BodyExt;
 use lambda_runtime::LambdaEvent;
 use std::{future::Future, pin::Pin};
@@ -53,16 +54,22 @@ where
 
         let mut builder = axum::http::request::Builder::new()
             .method(request.method)
-            .uri(format!("{}{}", request.host, request.path));
+            .uri(format!("https://{}{}", request.host, request.path));
         for (key, value) in request.headers {
             if let Some(k) = key {
                 builder = builder.header(k, value);
             }
         }
 
-        let request: axum::http::Request<axum::body::Body> = match request.body {
-            None => builder.body(axum::body::Body::default()).unwrap(),
-            Some(b) => builder.body(axum::body::Body::from(b)).unwrap(),
+        let request: axum::http::Request<axum::body::Body> = match (request.body, request.encoding)
+        {
+            (Some(b), Some(encoding)) if encoding == "base64" => {
+                let engine = base64::prelude::BASE64_STANDARD;
+                let body = axum::body::Body::from(engine.decode(b.as_ref()).unwrap_or_default());
+                builder.body(body).unwrap()
+            }
+            (Some(b), _) => builder.body(axum::body::Body::from(b)).unwrap(),
+            (None, _) => builder.body(axum::body::Body::default()).unwrap(),
         };
 
         let fut = self.inner.call(request);

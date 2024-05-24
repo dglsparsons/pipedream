@@ -19,10 +19,6 @@ async fn main() {
     let leptos_options = conf.leptos_options;
     let routes = generate_route_list(App);
 
-    for route in &routes {
-        log::info!("route: {:#?}", route.path());
-    }
-
     tokio::spawn(async move {
         let client = workflow::client().await;
         if std::env::var("LEPTOS_WORKER").is_err() {
@@ -37,8 +33,7 @@ async fn main() {
         }
     });
 
-    let addr = leptos_options.site_addr.clone();
-
+    let addr = leptos_options.site_addr;
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, App)
         .fallback(file_and_error_handler)

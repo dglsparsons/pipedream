@@ -61,3 +61,15 @@ resource "vercel_project" "pipedream" {
   serverless_function_region   = "dub1"
   skew_protection              = "12 hours"
 }
+
+resource "vercel_project_domain" "pipedream" {
+  project_id = vercel_project.pipedream.id
+  domain     = "pipedream-ci.vercel.app"
+}
+
+resource "vercel_project_environment_variable" "domain" {
+  project_id = vercel_project.pipedream.id
+  key        = "DOMAIN"
+  value      = vercel_project_domain.pipedream.domain
+  target     = ["production", "preview"]
+}
