@@ -50,6 +50,7 @@ enum HandleValue {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", untagged)]
+#[allow(clippy::large_enum_variant)]
 enum Route {
     Source {
         src: String,
@@ -180,13 +181,15 @@ fn main() {
         .into_iter()
         .map(|route| {
             let path = route.path().to_string();
-            let methods = route
-                .methods()
-                .map(|m| method_to_string(m))
-                .collect::<Vec<_>>();
+            let methods = route.methods().map(method_to_string).collect::<Vec<_>>();
+            let dest = if path == "/" {
+                Some("index".to_string())
+            } else {
+                Some(path.to_string())
+            };
             Route::Source {
                 src: path.clone(),
-                dest: Some(path),
+                dest,
                 methods: Some(methods),
                 headers: None,
                 r#continue: None,
@@ -217,15 +220,16 @@ fn main() {
 
     serde_json::to_writer_pretty(config_file, &config).expect("config file to be written");
     for route in routes {
-        if let Route::Source { src, .. } = route {
-            std::fs::create_dir_all(format!(".vercel/output/functions/{}.func", src)).unwrap();
-            let file_path = format!(".vercel/output/functions/{}.func/.vc-config.json", src);
+        if let Route::Source { dest, .. } = route {
+            let dest = dest.unwrap();
+            std::fs::create_dir_all(format!(".vercel/output/functions/{}.func", dest)).unwrap();
+            let file_path = format!(".vercel/output/functions/{}.func/.vc-config.json", dest);
             let func_file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .truncate(true)
                 .open(file_path.clone())
-                .expect(&format!("{file_path} func file should be writeable"));
+                .unwrap_or_else(|_| panic!("{file_path} func file should be writeable"));
 
             let mut files = HashMap::new();
             files.insert(

@@ -184,8 +184,7 @@ impl Client {
             w.created_at.to_rfc3339()
         );
 
-        self
-            .table
+        self.table
             .run_update(
                 self.table
                     .update()

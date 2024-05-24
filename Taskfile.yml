@@ -7,7 +7,7 @@ tasks:
     cmds:
       - cargo leptos build
       - LEPTOS_SITE_ROOT="." cargo lambda build --no-default-features --features=ssr --release --arm64
-      - cargo run --bin vercel
+      - cargo run --bin vercel --features ssr
     env:
       LEPTOS_OUTPUT_NAME: pipedream
     vars:
