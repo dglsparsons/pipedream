@@ -27,6 +27,10 @@ provider "github" {
   owner = "dglsparsons"
 }
 
+output "vercel_project_id" {
+  value = vercel_project.pipedream.id
+}
+
 resource "github_repository" "pipedream" {
   name                        = "pipedream"
   description                 = "Pipedream application for managing CI workflows"

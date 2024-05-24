@@ -12,6 +12,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.25"
     }
+    vercel = {
+      source  = "vercel/vercel"
+      version = "~> 1.11"
+    }
   }
 }
 
@@ -22,6 +26,18 @@ data "terraform_remote_state" "platform" {
   config = {
     bucket         = "dglsparsons-terraform-state"
     key            = "platform-core.tfstate"
+    region         = "eu-west-1"
+    dynamodb_table = "terraform-lock"
+  }
+}
+
+data "terraform_remote_state" "project" {
+  backend   = "s3"
+  workspace = "default"
+
+  config = {
+    bucket         = "dglsparsons-terraform-state"
+    key            = "pipedream-project.tfstate"
     region         = "eu-west-1"
     dynamodb_table = "terraform-lock"
   }
@@ -38,6 +54,10 @@ provider "aws" {
   assume_role {
     role_arn = "arn:aws:iam::${data.terraform_remote_state.platform.outputs.account_ids[local.environment]}:role/Deployer"
   }
+}
+
+provider "vercel" {
+  team = "stygian-software"
 }
 
 resource "aws_dynamodb_table" "workflows" {
@@ -72,6 +92,13 @@ resource "aws_dynamodb_table" "workflows" {
     name            = "workflows_by_status"
     projection_type = "ALL"
   }
+}
+
+resource "vercel_project_environment_variable" "dymanodb_workflows" {
+  project_id = data.terraform_remote_state.project.outputs.vercel_project_id
+  key        = "DYNAMODB_WORKFLOWS"
+  value      = aws_dynamodb_table.workflows.name
+  target     = ["production", "preview"]
 }
 
 data "aws_iam_policy_document" "workflows_dynamodb" {
