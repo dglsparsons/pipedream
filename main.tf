@@ -142,7 +142,6 @@ resource "aws_iam_policy" "workflows_dynamodb" {
 }
 
 
-## Here on down is just for local dev
 resource "aws_iam_user" "pipedream" {
   name          = "${local.prefix}-api"
   force_destroy = true
@@ -156,6 +155,31 @@ resource "aws_iam_user_policy_attachment" "workflows_dynamodb" {
 resource "aws_iam_access_key" "pipedream" {
   user    = aws_iam_user.pipedream.name
   pgp_key = "keybase:dgls"
+}
+
+resource "vercel_project_environment_variable" "aws_access_key" {
+  project_id = data.terraform_remote_state.project.outputs.vercel_project_id
+  key        = "AWS_ACCESS_KEY_ID"
+  sensitive  = true
+  value      = aws_iam_access_key.pipedream.id
+  target     = ["production", "preview"]
+}
+
+resource "vercel_project_environment_variable" "aws_secret_access_key" {
+  project_id = data.terraform_remote_state.project.outputs.vercel_project_id
+  key        = "AWS_SECRET_ACCESS_KEY"
+  sensitive  = true
+  value      = aws_iam_access_key.pipedream.encrypted_secret
+  target     = ["production", "preview"]
+}
+
+data "aws_region" "current" {}
+
+resource "vercel_project_environment_variable" "aws_region" {
+  project_id = data.terraform_remote_state.project.outputs.vercel_project_id
+  key        = "AWS_REGION"
+  target     = ["production", "preview"]
+  value      = data.aws_region.current.name
 }
 
 output "access_key" {
