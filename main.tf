@@ -157,19 +157,23 @@ resource "aws_iam_access_key" "pipedream" {
   pgp_key = "keybase:dgls"
 }
 
+resource "aws_iam_access_key" "pipedream_unencrypted" {
+  user = aws_iam_user.pipedream.name
+}
+
 resource "vercel_project_environment_variable" "aws_access_key" {
   project_id = data.terraform_remote_state.project.outputs.vercel_project_id
-  key        = "AWS_ACCESS_KEY_ID"
+  key        = "PIPEDREAM_AWS_ACCESS_KEY_ID"
   sensitive  = true
-  value      = aws_iam_access_key.pipedream.id
+  value      = aws_iam_access_key.pipedream_unencrypted.id
   target     = ["production", "preview"]
 }
 
 resource "vercel_project_environment_variable" "aws_secret_access_key" {
   project_id = data.terraform_remote_state.project.outputs.vercel_project_id
-  key        = "AWS_SECRET_ACCESS_KEY"
+  key        = "PIPEDREAM_AWS_SECRET_ACCESS_KEY"
   sensitive  = true
-  value      = aws_iam_access_key.pipedream.encrypted_secret
+  value      = aws_iam_access_key.pipedream_unencrypted.secret
   target     = ["production", "preview"]
 }
 
@@ -177,7 +181,7 @@ data "aws_region" "current" {}
 
 resource "vercel_project_environment_variable" "aws_region" {
   project_id = data.terraform_remote_state.project.outputs.vercel_project_id
-  key        = "AWS_REGION"
+  key        = "PIPEDREAM_AWS_REGION"
   target     = ["production", "preview"]
   value      = data.aws_region.current.name
 }

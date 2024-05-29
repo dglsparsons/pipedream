@@ -56,10 +56,11 @@ resource "vercel_project" "pipedream" {
     on_commit       = false
     on_pull_request = false
   }
-  preview_comments             = false
-  prioritise_production_builds = true
-  serverless_function_region   = "dub1"
-  skew_protection              = "12 hours"
+  preview_comments                                  = false
+  prioritise_production_builds                      = true
+  serverless_function_region                        = "dub1"
+  skew_protection                                   = "12 hours"
+  automatically_expose_system_environment_variables = false
 }
 
 resource "vercel_project_domain" "pipedream" {
