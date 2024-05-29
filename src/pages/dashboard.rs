@@ -70,31 +70,46 @@ fn WorkflowCard(workflow: Workflow) -> impl IntoView {
     let local_time: DateTime<Local> = DateTime::from(workflow.created_at.to_dt());
     view! {
         <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
-          <div class="p-6">
-            <h2 class="text-xl font-bold mb-2">{workflow.commit_message}</h2>
-            <p class="text-sm mb-4">Created {format!("{}", local_time.format("%d %b, %Y, %H:%M"))}</p>
-            <p class="text-green-500 mb-4">Status: {format!("{}", workflow.status)}</p>
-            <h3 class="text-lg font-bold">Environments:</h3>
-            <div class="flex flex-wrap justify-start gap-2">
-            <For
-              each=move || workflow.environments.clone().into_iter()
-              key=|w| w.name.clone()
-              children=move |w: Environment| {
-                  view! {
-                      <span
-                          class="px-2 py-1 text-white rounded"
-                          class=("bg-green-500", move || w.status == EnvironmentStatus::Success)
-                          class=("bg-red-500", move || w.status == EnvironmentStatus::Failure)
-                          class=("bg-yellow-500", move || w.status == EnvironmentStatus::Running)
-                          class=("bg-gray-500", move || w.status == EnvironmentStatus::Pending)
-                      >
-                          {w.name}
-                      </span>
-                  }
-              }
-            />
+            <div class="p-6">
+                <h2 class="text-xl font-bold mb-2">{workflow.commit_message}</h2>
+                <p class="text-sm mb-4">
+                    Created {format!("{}", local_time.format("%d %b, %Y, %H:%M"))}
+                </p>
+                <p class="text-green-500 mb-4">Status: {format!("{}", workflow.status)}</p>
+                <h3 class="text-lg font-bold">Environments:</h3>
+                <div class="flex flex-wrap justify-start gap-2">
+                    <For
+                        each=move || workflow.environments.clone().into_iter()
+                        key=|w| w.name.clone()
+                        children=move |w: Environment| {
+                            view! {
+                                <span
+                                    class="px-2 py-1 text-white rounded"
+                                    class=(
+                                        "bg-green-500",
+                                        move || w.status == EnvironmentStatus::Success,
+                                    )
+                                    class=(
+                                        "bg-red-500",
+                                        move || w.status == EnvironmentStatus::Failure,
+                                    )
+                                    class=(
+                                        "bg-yellow-500",
+                                        move || w.status == EnvironmentStatus::Running,
+                                    )
+                                    class=(
+                                        "bg-gray-500",
+                                        move || w.status == EnvironmentStatus::Pending,
+                                    )
+                                >
+                                    {w.name}
+                                </span>
+                            }
+                        }
+                    />
+
+                </div>
             </div>
-          </div>
         </div>
     }
 }
@@ -122,33 +137,33 @@ fn Deployments(repo: ReadSignal<String>) -> impl IntoView {
     });
 
     view! {
-        <Title text={repo}/>
-        <Transition
-            fallback=move || view! { <p>"Loading..."</p> }
-        >
+        <Title text=repo/>
+        <Transition fallback=move || view! { <p>"Loading..."</p> }>
             <main class="p-6 grid grid-cols-1 gap-4">
-            {
-                move || workflows.get().map(|w| match w {
-                    Ok(w) => {
-                        view! {
-                            <For
-                              each=move || w.clone()
-                              key=|w| w.id.clone()
-                              children=move |w: Workflow| {
-                                  view! {
-                                      <WorkflowCard workflow=w/>
-                                  }
-                              }
-                            />
-                        }.into_view()
-                    },
-                    Err(e) => {
-                        view! {
-                            <p>Something went wrong: {format!("{}", e)}</p>
-                        }.into_view()
-                    },
-                })
-            }
+
+                {move || {
+                    workflows
+                        .get()
+                        .map(|w| match w {
+                            Ok(w) => {
+                                view! {
+                                    <For
+                                        each=move || w.clone()
+                                        key=|w| w.id.clone()
+                                        children=move |w: Workflow| {
+                                            view! { <WorkflowCard workflow=w/> }
+                                        }
+                                    />
+                                }
+                                    .into_view()
+                            }
+                            Err(e) => {
+                                view! { <p>Something went wrong: {format!("{}", e)}</p> }
+                                    .into_view()
+                            }
+                        })
+                }}
+
             </main>
         </Transition>
     }
@@ -158,10 +173,7 @@ fn Deployments(repo: ReadSignal<String>) -> impl IntoView {
 pub fn SelectOption(is: String, value: ReadSignal<String>) -> impl IntoView {
     let v = is.clone();
     view! {
-        <option
-            value=&v
-            selected=move || value() == is
-        >
+        <option value=&v selected=move || value() == is>
             {v}
         </option>
     }
@@ -186,44 +198,47 @@ pub fn Dashboard() -> impl IntoView {
 
     view! {
         <div class="min-h-screen bg-gray-100 dark:bg-gray-800 dark:text-white">
-          <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
-            <div class="flex items-center">
-              <Transition
-                  fallback=move || view! { <select
-                                class="min-w-[100px] flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      >"Loading..."</select> }
-              >
-                  {
-                    move || repos.get().map(|repos| match repos {
-                      Ok(repos) => {
-                          view! {
-                            <select
-                                class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                on:change=move |ev| {
-                              let new_value = event_target_value(&ev);
-                              set_repo(new_value);
-                            }>
-                              <For
-                                each=move || repos.clone()
-                                key=|r| r.clone()
-                                let:child
-                              >
-                                  <SelectOption is={child} value={repo}/>
-                              </For>
-                            </select>
-                          }.into_view()
-                      },
-                      Err(e) => {
+            <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
+                <div class="flex items-center">
+                    <Transition fallback=move || {
                         view! {
-                            <p>Something went wrong: {format!("{}", e)}</p>
-                        }.into_view()
-                      }
-                    })
-                  }
-              </Transition>
-            </div>
-          </header>
-          <Deployments repo={repo}/>
+                            <select class="min-w-[100px] flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                "Loading..."
+                            </select>
+                        }
+                    }>
+
+                        {move || {
+                            repos
+                                .get()
+                                .map(|repos| match repos {
+                                    Ok(repos) => {
+                                        view! {
+                                            <select
+                                                class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                on:change=move |ev| {
+                                                    let new_value = event_target_value(&ev);
+                                                    set_repo(new_value);
+                                                }
+                                            >
+                                                <For each=move || repos.clone() key=|r| r.clone() let:child>
+                                                    <SelectOption is=child value=repo/>
+                                                </For>
+                                            </select>
+                                        }
+                                            .into_view()
+                                    }
+                                    Err(e) => {
+                                        view! { <p>Something went wrong: {format!("{}", e)}</p> }
+                                            .into_view()
+                                    }
+                                })
+                        }}
+
+                    </Transition>
+                </div>
+            </header>
+            <Deployments repo=repo/>
         </div>
     }
 }

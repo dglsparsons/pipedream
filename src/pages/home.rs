@@ -27,20 +27,35 @@ pub fn Home() -> impl IntoView {
     let github_client_id = create_resource(|| (), |_| github_info());
     view! {
         <div class="min-h-screen bg-gray-100 dark:bg-gray-800 dark:text-white">
-          <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
-            <Suspense fallback=move || view! { <p>Log in with Github</p> }>
-              {move || {
-                github_client_id.get().map(|result| match result {
-                  Ok(github_info) => view! {
-                    <a class="cursor-pointer" href=format!("https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}", github_info.client_id, github_info.redirect_uri)>
-                      Log in with Github
-                    </a>
-                  }.into_view(),
-                  Err(_) => view! { <p></p> }.into_view(),
-                })
-              }}
-            </Suspense>
-          </header>
+            <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
+                <Suspense fallback=move || {
+                    view! { <p>Log in with Github</p> }
+                }>
+                    {move || {
+                        github_client_id
+                            .get()
+                            .map(|result| match result {
+                                Ok(github_info) => {
+                                    view! {
+                                        <a
+                                            class="cursor-pointer"
+                                            href=format!(
+                                                "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}",
+                                                github_info.client_id,
+                                                github_info.redirect_uri,
+                                            )
+                                        >
+                                            Log in with Github
+                                        </a>
+                                    }
+                                        .into_view()
+                                }
+                                Err(_) => view! { <p></p> }.into_view(),
+                            })
+                    }}
+
+                </Suspense>
+            </header>
         </div>
     }
 }
