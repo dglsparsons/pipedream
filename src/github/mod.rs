@@ -446,7 +446,19 @@ pub async fn list_user_installations(token: &str) -> Result<Vec<Installation>, a
     Ok(response.installations)
 }
 
-pub async fn validate_oidc_token(token: &str) -> Result<(), anyhow::Error> {
+#[derive(Debug, Deserialize)]
+struct JWKResponse {
+    keys: Vec<jsonwebtoken::jwk::Jwk>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,
+    aud: String,
+    iss: String,
+}
+
+pub async fn validate_oidc_token(token: &str, owner: &str) -> Result<(), anyhow::Error> {
     let res = http()
         .await
         .get("https://token.actions.githubusercontent.com/.well-known/jwks")
@@ -470,13 +482,12 @@ pub async fn validate_oidc_token(token: &str) -> Result<(), anyhow::Error> {
         );
         return Err(anyhow::anyhow!("failed to list github JWKs"));
     }
-
-    let jwks = res
-        .json::<Vec<jsonwebtoken::jwk::Jwk>>()
+    let res = res
+        .json::<JWKResponse>()
         .await
-        .context("parsing github list repositories response")?;
+        .context("parsing github JWK response")?;
 
-    let jwks = JwkSet { keys: jwks };
+    let jwks = JwkSet { keys: res.keys };
 
     let key = jsonwebtoken::decode_header(token)
         .context("decoding header")
@@ -489,8 +500,33 @@ pub async fn validate_oidc_token(token: &str) -> Result<(), anyhow::Error> {
 
     let mut validation = Validation::new(Algorithm::RS256);
     validation.set_issuer(&["https://token.actions.githubusercontent.com"]);
+    validation.set_audience(&[format!("https://github.com/{owner}")]);
 
-    decode::<()>(token, &key, &validation).context("decoding token")?;
+    decode::<Claims>(token, &key, &validation).context("decoding token")?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::JWKResponse;
+
+    #[tokio::test]
+    async fn test_decoding_jwk() {
+        let raw = r#"{
+  "keys": [
+    {
+      "kty": "RSA",
+      "alg": "RS256",
+      "use": "sig",
+      "kid": "cc413527-173f-5a05-976e-9c52b1d7b431",
+      "n": "w4M936N3ZxNaEblcUoBm-xu0-V9JxNx5S7TmF0M3SBK-2bmDyAeDdeIOTcIVZHG-ZX9N9W0u1yWafgWewHrsz66BkxXq3bscvQUTAw7W3s6TEeYY7o9shPkFfOiU3x_KYgOo06SpiFdymwJflRs9cnbaU88i5fZJmUepUHVllP2tpPWTi-7UA3AdP3cdcCs5bnFfTRKzH2W0xqKsY_jIG95aQJRBDpbiesefjuyxcQnOv88j9tCKWzHpJzRKYjAUM6OPgN4HYnaSWrPJj1v41eEkFM1kORuj-GSH2qMVD02VklcqaerhQHIqM-RjeHsN7G05YtwYzomE5G-fZuwgvQ",
+      "e": "AQAB"
+    },
+  ]
+}"#;
+
+        let v: Result<JWKResponse, _> = serde_json::from_str(raw);
+        assert!(v.is_ok());
+    }
 }

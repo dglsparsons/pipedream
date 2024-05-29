@@ -8,11 +8,20 @@ tasks:
       - cargo run --bin vercel --features ssr
     env:
       LEPTOS_OUTPUT_NAME: pipedream
-  release:
+  build-prod:
     cmds:
       - cargo leptos build --release
       - LEPTOS_SITE_ROOT="." cargo lambda build --release --no-default-features --features=ssr --arm64
       - cargo run --bin vercel --features ssr
-      - vercel deploy --prebuilt --prod
     env:
       LEPTOS_OUTPUT_NAME: pipedream
+  release:
+    deps:
+      - build
+    cmds:
+      - vercel deploy --prebuilt --prod
+  release-prod:
+    deps:
+      - build-prod
+    cmds:
+      - vercel deploy --prebuilt --prod

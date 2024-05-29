@@ -59,7 +59,11 @@ pub async fn create_workflow(
         ServerFnError::new("missing authorization header")
     })?;
 
-    let token = auth_header.to_str().map_err(|_| {
+    let token = auth_header.to_str().map_err(|e| {
+        log::info!(
+            "failed to get header value from header {auth_header:?}: {:#}",
+            e
+        );
         response.set_status(StatusCode::BAD_REQUEST);
         ServerFnError::new("invalid authorization header")
     })?;
@@ -70,7 +74,7 @@ pub async fn create_workflow(
         token
     };
 
-    crate::github::validate_oidc_token(token)
+    crate::github::validate_oidc_token(token, &owner)
         .await
         .map_err(|e| {
             response.set_status(StatusCode::UNAUTHORIZED);
