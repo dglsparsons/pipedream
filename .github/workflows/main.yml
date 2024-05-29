@@ -1,0 +1,27 @@
+name: main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: moonrepo/setup-rust@v1
+        with:
+          inherit-toolchain: true
+          cache-target: release
+          bins: cargo-leptos, cargo-lambda, cargo-zigbuild
+      - name: build
+        env:
+          LEPTOS_OUTPUT_NAME: pipedream
+        run: |
+          cargo leptos build --release
+          LEPTOS_SITE_ROOT="." cargo lambda build --release --no-default-features --features=ssr --arm64
+          cargo run --bin vercel --features ssr
+      - name: release
+        run: vercel deploy --prebuilt --prod
+
