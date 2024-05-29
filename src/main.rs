@@ -9,10 +9,7 @@ async fn main() {
     use pipedream::workflow;
     use tokio::time::{sleep, Duration};
 
-    if dotenvy::dotenv_override().is_err() {
-        // use pipedream::aws::
-        // File was not found. Load everything from parameter store as we're in AWS land.
-    }
+    _ = dotenvy::dotenv_override();
 
     simple_logger::init_with_level(log::Level::Info).expect("couldn't initialize logging");
     let conf = get_configuration(None).await.unwrap();
@@ -39,22 +36,16 @@ async fn main() {
         .fallback(file_and_error_handler)
         .with_state(leptos_options);
 
-    // In development, we use the Hyper server
-    #[cfg(debug_assertions)]
-    {
-        let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-        log::info!("listening on http://{}", &addr);
-        axum::serve(listener, app).await.unwrap();
-    }
-
-    // In release, we use the lambda_http crate
-    #[cfg(not(debug_assertions))]
-    {
+    if std::env::var("LOCAL_DEV").is_err() {
         let app = tower::ServiceBuilder::new()
             .layer(pipedream::vercel_axum::VercelLayer)
             .service(app);
 
         lambda_runtime::run(app).await.unwrap();
+    } else {
+        let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+        log::info!("listening on http://{}", &addr);
+        axum::serve(listener, app).await.unwrap();
     }
 }
 
