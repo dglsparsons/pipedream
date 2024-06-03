@@ -15,6 +15,7 @@ jobs:
           inherit-toolchain: true
           cache-target: release
           bins: cargo-leptos@0.2.17, cargo-lambda, cargo-zigbuild
+      - uses: goto-bus-stop/setup-zig@v2.2.0
       - name: write github private key
         run: echo $PIPEDREAM_GITHUB_PRIVATE_KEY > pipedream-ci.private-key.pem
       - name: build
