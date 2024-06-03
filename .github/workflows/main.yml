@@ -15,6 +15,8 @@ jobs:
           inherit-toolchain: true
           cache-target: release
           bins: cargo-leptos@0.2.17, cargo-lambda, cargo-zigbuild
+      - name: write github private key
+        run: echo $PIPEDREAM_GITHUB_PRIVATE_KEY > pipedream-ci.private-key.pem
       - name: build
         env:
           LEPTOS_OUTPUT_NAME: pipedream
@@ -24,4 +26,3 @@ jobs:
           cargo run --bin vercel --features ssr
       - name: release
         run: vercel deploy --prebuilt --prod
-

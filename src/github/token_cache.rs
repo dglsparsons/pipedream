@@ -70,7 +70,7 @@ fn generate_jwt() -> Result<String, anyhow::Error> {
         &Header::new(Algorithm::RS256),
         &my_claims,
         &EncodingKey::from_rsa_pem(include_bytes!(
-            "../../pipedream-ci.2024-03-01.private-key.pem"
+            "../../pipedream-ci.private-key.pem"
         ))
         .context("creating encoding key from RSA pem")?,
     )
