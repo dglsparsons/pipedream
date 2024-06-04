@@ -26,4 +26,4 @@ jobs:
           LEPTOS_SITE_ROOT="." cargo lambda build --release --no-default-features --features=ssr --arm64
           cargo run --bin vercel --features ssr
       - name: release
-        run: vercel deploy --prebuilt --prod
+        run: vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_API_TOKEN }}
