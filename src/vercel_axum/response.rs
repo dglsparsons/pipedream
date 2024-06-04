@@ -17,23 +17,3 @@ pub struct EventResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) encoding: Option<String>,
 }
-
-fn serialize_headers<S>(headers: &HeaderMap<HeaderValue>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut map = serializer.serialize_map(Some(headers.keys_len()))?;
-    for key in headers.keys() {
-        let map_values = headers
-            .get_all(key)
-            .into_iter()
-            .map(HeaderValue::to_str)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(S::Error::custom)?;
-
-        for v in &map_values {
-            map.serialize_entry(key.as_str(), v)?;
-        }
-    }
-    map.end()
-}
