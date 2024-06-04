@@ -57,6 +57,7 @@ base64 = { version = "0.22.1", optional = true }
 serde_derive = { version = "1.0.202", optional = true }
 http-body-util = { version = "0.1.1", optional = true }
 server_fn = { version = "0.6", optional = true }
+http-serde = "2.1.1"
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]

@@ -83,6 +83,7 @@ where
                 "" => None,
                 _ => Some(lambda_http::Body::from(body)),
             };
+            println!("headers: {:?}", parts.headers);
             Ok(EventResponse {
                 status_code: parts.status.as_u16(),
                 body,

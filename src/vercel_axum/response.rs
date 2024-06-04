@@ -9,7 +9,7 @@ pub struct EventResponse {
     pub(crate) status_code: u16,
     #[serde(
         skip_serializing_if = "HeaderMap::is_empty",
-        serialize_with = "serialize_headers"
+        with = "http_serde::header_map"
     )]
     pub(crate) headers: HeaderMap<HeaderValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -24,8 +24,16 @@ where
 {
     let mut map = serializer.serialize_map(Some(headers.keys_len()))?;
     for key in headers.keys() {
-        let map_value = headers[key].to_str().map_err(S::Error::custom)?;
-        map.serialize_entry(key.as_str(), map_value)?;
+        let map_values = headers
+            .get_all(key)
+            .into_iter()
+            .map(HeaderValue::to_str)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(S::Error::custom)?;
+
+        for v in &map_values {
+            map.serialize_entry(key.as_str(), v)?;
+        }
     }
     map.end()
 }
