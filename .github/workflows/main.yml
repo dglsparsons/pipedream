@@ -1,0 +1,29 @@
+name: main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: moonrepo/setup-rust@v1
+        with:
+          inherit-toolchain: true
+          cache-target: release
+          bins: cargo-leptos@0.2.17, cargo-lambda, cargo-zigbuild
+      - uses: goto-bus-stop/setup-zig@v2.2.0
+      - name: write github private key
+        run: echo $PIPEDREAM_GITHUB_PRIVATE_KEY > pipedream-ci.private-key.pem
+      - name: build
+        env:
+          LEPTOS_OUTPUT_NAME: pipedream
+        run: |
+          cargo leptos build --release
+          LEPTOS_SITE_ROOT="." cargo lambda build --release --no-default-features --features=ssr --arm64
+          cargo run --bin vercel --features ssr
+      - name: release
+        run: vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_API_TOKEN }}
