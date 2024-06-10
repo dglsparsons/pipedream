@@ -69,41 +69,72 @@ pub async fn list_repos() -> Result<Vec<String>, ServerFnError> {
 fn WorkflowCard(workflow: Workflow) -> impl IntoView {
     let local_time: DateTime<Local> = DateTime::from(workflow.created_at.to_dt());
     view! {
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div class="rounded-lg border border-gray-600 bg-gray-700 text-card-foreground shadow-sm">
             <div class="p-6">
-                <h2 class="text-xl font-bold mb-2">{workflow.commit_message}</h2>
-                <p class="text-sm mb-4">
+                <h2 class="text-xl font-bold mb-1">{workflow.commit_message}</h2>
+                <p class="text-sm mb-1 font-extralight">
                     Created {format!("{}", local_time.format("%d %b, %Y, %H:%M"))}
                 </p>
-                <p class="text-green-500 mb-4">Status: {format!("{}", workflow.status)}</p>
-                <h3 class="text-lg font-bold">Environments:</h3>
+                <p
+                    class="text-sm mb-6"
+                    class=("text-green-500", move || workflow.status == workflow::Status::Success)
+                    class=("text-red-500", move || workflow.status == workflow::Status::Failure)
+                    class=("text-yellow-500", move || workflow.status == workflow::Status::Running)
+                    class=("text-orange-500", move || workflow.status == workflow::Status::Paused)
+                >
+
+                    Status:
+                    {format!("{}", workflow.status)}
+                </p>
                 <div class="flex flex-wrap justify-start gap-2">
                     <For
                         each=move || workflow.environments.clone().into_iter()
                         key=|w| w.name.clone()
                         children=move |w: Environment| {
+                            let owner = workflow.owner.clone();
+                            let repo = workflow.repo.clone();
+                            let name = w.name.clone();
                             view! {
-                                <span
+                                <a
+                                    rel="external noopener"
+                                    href=move || {
+                                        format!(
+                                            "https://github.com/{}/{}/deployments/{}",
+                                            owner,
+                                            repo,
+                                            name,
+                                        )
+                                    }
+
                                     class="px-2 py-1 text-white rounded"
                                     class=(
                                         "bg-green-500",
                                         move || w.status == EnvironmentStatus::Success,
                                     )
+
+                                    class=(
+                                        "bg-green-500",
+                                        move || w.status == EnvironmentStatus::Queued,
+                                    )
+
                                     class=(
                                         "bg-red-500",
                                         move || w.status == EnvironmentStatus::Failure,
                                     )
+
                                     class=(
                                         "bg-yellow-500",
                                         move || w.status == EnvironmentStatus::Running,
                                     )
+
                                     class=(
                                         "bg-gray-500",
                                         move || w.status == EnvironmentStatus::Pending,
                                     )
                                 >
+
                                     {w.name}
-                                </span>
+                                </a>
                             }
                         }
                     />
@@ -139,8 +170,7 @@ fn Deployments(repo: ReadSignal<String>) -> impl IntoView {
     view! {
         <Title text=repo/>
         <Transition fallback=move || view! { <p>"Loading..."</p> }>
-            <main class="p-6 grid grid-cols-1 gap-4">
-
+            <main class="px-6 py-8 grid grid-cols-1 gap-4 gap-y-8 max-w-4xl mx-auto">
                 {move || {
                     workflows
                         .get()
@@ -198,11 +228,11 @@ pub fn Dashboard() -> impl IntoView {
 
     view! {
         <div class="min-h-screen bg-gray-100 dark:bg-gray-800 dark:text-white">
-            <header class="flex items-center justify-between p-6 bg-white shadow dark:bg-gray-900">
-                <div class="flex items-center">
+            <header class="flex justify-between p-6 bg-white shadow dark:bg-gray-900">
+                <div class="flex max-w-6xl mx-auto w-full">
                     <Transition fallback=move || {
                         view! {
-                            <select class="min-w-[100px] flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                            <select class="min-w-24 max-w-48 flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                                 "Loading..."
                             </select>
                         }
@@ -215,12 +245,13 @@ pub fn Dashboard() -> impl IntoView {
                                     Ok(repos) => {
                                         view! {
                                             <select
-                                                class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                class="flex h-10 items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                                 on:change=move |ev| {
                                                     let new_value = event_target_value(&ev);
                                                     set_repo(new_value);
                                                 }
                                             >
+
                                                 <For each=move || repos.clone() key=|r| r.clone() let:child>
                                                     <SelectOption is=child value=repo/>
                                                 </For>
@@ -229,12 +260,12 @@ pub fn Dashboard() -> impl IntoView {
                                             .into_view()
                                     }
                                     Err(e) => {
-                                        view! { <p>Something went wrong: {format!("{}", e)}</p> }
+                                        view! { <p>Something went wrong: {format!("{e}")}</p> }
                                             .into_view()
                                     }
                                 })
                         }}
-
+                        <div class="grow"></div>
                     </Transition>
                 </div>
             </header>
