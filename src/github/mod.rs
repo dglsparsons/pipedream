@@ -74,11 +74,11 @@ pub enum WorkflowStatus {
 
 #[derive(Debug, Deserialize)]
 pub struct Workflow {
-    pub id: u64,
-    pub name: String,
-    pub head_sha: String,
-    pub head_branch: String,
-    pub event: String,
+    // pub id: u64,
+    // pub name: String,
+    // pub head_sha: String,
+    // pub head_branch: String,
+    // pub event: String,
     pub status: WorkflowStatus,
 }
 
@@ -277,9 +277,9 @@ pub struct OauthTokenResponse {
     pub access_token: String,
     pub expires_in: i64, // number of seconds until expiration
     pub refresh_token: String,
-    pub refresh_token_expires_in: u64,
-    pub scope: String,
-    pub token_type: String,
+    // pub refresh_token_expires_in: u64,
+    // pub scope: String,
+    // pub token_type: String,
 }
 
 pub async fn exchange_oauth_token(code: &str) -> Result<OauthTokenResponse, anyhow::Error> {
@@ -394,13 +394,13 @@ pub async fn list_installation_repositories(
 pub struct InstallationAccount {
     #[allow(dead_code)]
     id: i64,
-    pub login: String,
+    // pub login: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Installation {
     pub id: i64,
-    pub account: InstallationAccount,
+    // pub account: InstallationAccount,
 }
 
 #[derive(Debug, Deserialize)]

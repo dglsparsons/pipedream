@@ -1,8 +1,10 @@
+use crate::app::Logout;
 use crate::workflow;
 use crate::workflow::{Environment, EnvironmentStatus, Workflow};
 use chrono::{DateTime, Local};
 use leptos::*;
 use leptos_meta::Title;
+use leptos_router::{ActionForm, A};
 use std::time::Duration;
 
 #[server(ListWorkflows)]
@@ -13,6 +15,9 @@ pub async fn list_workflows(
     if owner.is_empty() || repo.is_empty() {
         return Ok(vec![]);
     }
+
+    // TODO - authentication middleware. Currently this is unauthenticated. .
+
     match workflow::client().await.list(owner, repo).await {
         Err(e) => {
             log::error!("failed to list workflows: {:#}", e);
@@ -168,9 +173,8 @@ fn Deployments(repo: ReadSignal<String>) -> impl IntoView {
     });
 
     view! {
-        <Title text=repo/>
         <Transition fallback=move || view! { <p>"Loading..."</p> }>
-            <main class="px-6 py-8 grid grid-cols-1 gap-4 gap-y-8 max-w-4xl mx-auto">
+            <main class="px-6 py-8 grid grid-cols-1 gap-4 gap-y-8">
                 {move || {
                     workflows
                         .get()
@@ -213,6 +217,7 @@ pub fn SelectOption(is: String, value: ReadSignal<String>) -> impl IntoView {
 pub fn Dashboard() -> impl IntoView {
     let (repo, set_repo) = create_signal("".to_string());
     let repos = create_local_resource(move || (), |_| list_repos());
+    let logout = create_server_action::<Logout>();
 
     create_effect(move |_| {
         if repo.get().is_empty() {
@@ -228,8 +233,25 @@ pub fn Dashboard() -> impl IntoView {
 
     view! {
         <div class="min-h-screen bg-gray-100 dark:bg-gray-800 dark:text-white">
-            <header class="flex justify-between p-6 bg-white shadow dark:bg-gray-900">
-                <div class="flex max-w-6xl mx-auto w-full">
+            <header class="p-6 bg-white shadow dark:bg-gray-900">
+                <div class="flex justify-between max-w-6xl mx-auto w-full">
+                    <nav class="flex flex-row gap-8">
+                        <A href="/dashboard" class="flex items-center">
+                            Deployments
+                        </A>
+                        <A href="/environments" class="flex items-center">
+                            Environments
+                        </A>
+                    </nav>
+                    <ActionForm class="flex items-center gap-4" action=logout>
+                        <button type="submit" class="text-sm">
+                            Logout
+                        </button>
+                    </ActionForm>
+                </div>
+            </header>
+            <main class="max-w-4xl mx-auto w-full">
+                <div class="pt-12 px-6 flex flex-row justify-between">
                     <Transition fallback=move || {
                         view! {
                             <select class="min-w-24 max-w-48 flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
@@ -265,11 +287,15 @@ pub fn Dashboard() -> impl IntoView {
                                     }
                                 })
                         }}
-                        <div class="grow"></div>
+
                     </Transition>
+                    <button class="bg-rose-800 text-white font-semibold py-2 px-4 rounded hover:bg-rose-700 transition duration-300">
+                        Stop Deployments
+                    </button>
+                    <Title text=repo/>
                 </div>
-            </header>
-            <Deployments repo=repo/>
+                <Deployments repo=repo/>
+            </main>
         </div>
     }
 }

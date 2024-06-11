@@ -4,6 +4,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -99,6 +100,41 @@ pub async fn create_workflow(
     Ok(Response {
         url: format!("https://pipedream.fly.dev/{}/{}/{}", owner, repo, sha),
     })
+}
+
+#[server(Logout)]
+#[allow(clippy::unused_async)]
+pub async fn logout() -> Result<(), ServerFnError> {
+    use axum_extra::extract::cookie::{Cookie, SameSite};
+    use http::header;
+    use leptos::expect_context;
+
+    let response = expect_context::<leptos_axum::ResponseOptions>();
+    let cookie = Cookie::build(("access", ""))
+        .path("/")
+        .secure(true)
+        .same_site(SameSite::Strict)
+        .expires(OffsetDateTime::UNIX_EPOCH)
+        .http_only(true);
+
+    if let Ok(cookie) = header::HeaderValue::from_str(&cookie.to_string()) {
+        response.append_header(header::SET_COOKIE, cookie);
+    }
+
+    let cookie = Cookie::build(("refresh", ""))
+        .path("/")
+        .secure(true)
+        .same_site(SameSite::Strict)
+        .expires(OffsetDateTime::UNIX_EPOCH)
+        .http_only(true);
+
+    if let Ok(cookie) = header::HeaderValue::from_str(&cookie.to_string()) {
+        response.append_header(header::SET_COOKIE, cookie);
+    }
+
+    leptos_axum::redirect("/");
+
+    Ok(())
 }
 
 #[server(Authorize, "/api", "GetJson", "github/callback")]
