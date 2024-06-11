@@ -1,6 +1,5 @@
 use lambda_http::http::header::{HeaderMap, HeaderValue};
 use lambda_http::Body;
-use serde::ser::{Error as SerError, SerializeMap, Serializer};
 use serde_derive::Serialize;
 
 #[derive(Serialize, Debug)]
