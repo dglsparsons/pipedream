@@ -2,6 +2,7 @@ use crate::app::Logout;
 use crate::workflow;
 use crate::workflow::{Environment, EnvironmentStatus, Workflow};
 use chrono::{DateTime, Local};
+use leptos::html::Dialog;
 use leptos::*;
 use leptos_meta::Title;
 use leptos_router::{ActionForm, A};
@@ -74,7 +75,7 @@ pub async fn list_repos() -> Result<Vec<String>, ServerFnError> {
 fn WorkflowCard(workflow: Workflow) -> impl IntoView {
     let local_time: DateTime<Local> = DateTime::from(workflow.created_at.to_dt());
     view! {
-        <div class="rounded-lg border border-gray-600 bg-gray-700 text-card-foreground shadow-sm">
+        <div class="rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-200 dark:bg-gray-700 text-card-foreground shadow-sm">
             <div class="p-6">
                 <h2 class="text-xl font-bold mb-1">{workflow.commit_message}</h2>
                 <p class="text-sm mb-1 font-extralight">
@@ -231,6 +232,8 @@ pub fn Dashboard() -> impl IntoView {
         }
     });
 
+    let dialog = create_node_ref::<Dialog>();
+
     view! {
         <div class="min-h-screen bg-gray-100 dark:bg-gray-800 dark:text-white">
             <header class="p-6 bg-white shadow dark:bg-gray-900">
@@ -251,7 +254,7 @@ pub fn Dashboard() -> impl IntoView {
                 </div>
             </header>
             <main class="max-w-4xl mx-auto w-full">
-                <div class="pt-12 px-6 flex flex-row justify-between">
+                <div class="pt-12 px-6 flex flex-col sm:flex-row sm:justify-between">
                     <Transition fallback=move || {
                         view! {
                             <select class="min-w-24 max-w-48 flex h-10 w-full items-center justify-between rounded-md border border-input bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
@@ -289,12 +292,46 @@ pub fn Dashboard() -> impl IntoView {
                         }}
 
                     </Transition>
-                    <button class="bg-rose-800 text-white font-semibold py-2 px-4 rounded hover:bg-rose-700 transition duration-300">
-                        Stop Deployments
+                    <button
+                        on:click=move |_| {
+                            _ = dialog.get().unwrap().show_modal();
+                        }
+
+                        class="bg-rose-800 mt-6 sm:mt-0 text-white font-semibold py-2 px-4 rounded hover:bg-rose-700 transition duration-300"
+                    >
+                        Pause Deployments
                     </button>
                     <Title text=repo/>
                 </div>
                 <Deployments repo=repo/>
+                <dialog
+                    _ref=dialog
+                    class="p-8 drop-shadow-lg dark:bg-gray-700 rounded-xl dark:text-white"
+                >
+                    <h2 class="font-bold text-xl mb-12">Confirm Deployment Pause</h2>
+                    <p class="mb-4">Are you sure you wish to pause all deployments?</p>
+                    <p>
+                        This will stop new deployments, as well as those ongoing. You must manually re-enable deployments.
+                    </p>
+                    <div class="flex flex-col-reverse sm:flex-row justify-between mt-12">
+                        <button
+                            class="mt-4 sm:mt-0 border-gray-300 hover:border-gray-400 rounded py-2 px-4 border"
+                            type="button"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            on:click=move |_| {
+                                _ = dialog.get().unwrap().show_modal();
+                            }
+
+                            class="bg-rose-800 text-white font-semibold py-2 px-4 rounded hover:bg-rose-700 transition duration-300"
+                        >
+                            Pause Deployments
+                        </button>
+                    </div>
+                </dialog>
             </main>
         </div>
     }
