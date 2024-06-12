@@ -50,6 +50,18 @@ resource "github_repository" "pipedream" {
   has_downloads               = false
 }
 
+resource "github_actions_secret" "vercel_org_id" {
+  repository      = github_repository.pipedream.name
+  secret_name     = "VERCEL_ORG_ID"
+  plaintext_value = vercel_project.pipedream.team_id
+}
+
+resource "github_actions_secret" "vercel_project_id" {
+  repository      = github_repository.pipedream.name
+  secret_name     = "VERCEL_PROJECT_ID"
+  plaintext_value = vercel_project.pipedream.id
+}
+
 resource "vercel_project" "pipedream" {
   name = "pipedream"
   git_comments = {
