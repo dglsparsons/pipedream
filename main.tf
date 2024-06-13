@@ -94,6 +94,24 @@ resource "aws_dynamodb_table" "workflows" {
   }
 }
 
+resource "aws_dynamodb_table" "blocks" {
+  name         = "${local.prefix}-blocks"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id" # composite of owner/repo
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
+
+resource "vercel_project_environment_variable" "dynamodb_blocks" {
+  project_id = data.terraform_remote_state.project.outputs.vercel_project_id
+  key        = "DYNAMODB_BLOCKS"
+  value      = aws_dynamodb_table.blocks.name
+  target     = ["production", "preview"]
+}
+
 resource "vercel_project_environment_variable" "dynamodb_workflows" {
   project_id = data.terraform_remote_state.project.outputs.vercel_project_id
   key        = "DYNAMODB_WORKFLOWS"
@@ -136,11 +154,28 @@ data "aws_iam_policy_document" "workflows_dynamodb" {
   }
 }
 
+data "aws_iam_policy_document" "blocks_dynamodb" {
+  statement {
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:DeleteItem",
+    ]
+    resources = [
+      aws_dynamodb_table.blocks.arn,
+    ]
+  }
+}
+
 resource "aws_iam_policy" "workflows_dynamodb" {
   name   = "${local.prefix}-workflows-dynamodb"
   policy = data.aws_iam_policy_document.workflows_dynamodb.json
 }
 
+resource "aws_iam_policy" "blocks_dynamodb" {
+  name   = "${local.prefix}-blocks-dynamodb"
+  policy = data.aws_iam_policy_document.blocks_dynamodb.json
+}
 
 resource "aws_iam_user" "pipedream" {
   name          = "${local.prefix}-api"
@@ -150,6 +185,11 @@ resource "aws_iam_user" "pipedream" {
 resource "aws_iam_user_policy_attachment" "workflows_dynamodb" {
   user       = aws_iam_user.pipedream.name
   policy_arn = aws_iam_policy.workflows_dynamodb.arn
+}
+
+resource "aws_iam_user_policy_attachment" "blocks_dynamodb" {
+  user       = aws_iam_user.pipedream.name
+  policy_arn = aws_iam_policy.blocks_dynamodb.arn
 }
 
 resource "aws_iam_access_key" "pipedream" {

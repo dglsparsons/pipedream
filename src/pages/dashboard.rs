@@ -1,4 +1,4 @@
-use crate::app::Logout;
+use crate::auth::Logout;
 use crate::workflow;
 use crate::workflow::{Environment, EnvironmentStatus, Workflow};
 use chrono::{DateTime, Local};
