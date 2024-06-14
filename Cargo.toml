@@ -49,15 +49,10 @@ dotenvy = { version = "0.15.7", optional = true }
 axum-extra = { version = "0.9.3", optional = true, features = ["cookie"] }
 time = "0.3.34"
 openssl = { version = "0.10.64", features = ["vendored"], optional = true }
-lambda_http = { version = "0.11.1", optional = true }
-tower-service = { version = "0.3.2", optional = true }
 serde_json = { version = "1.0.117", optional = true }
-lambda_runtime = { version = "0.11.2", optional = true }
-base64 = { version = "0.22.1", optional = true }
-serde_derive = { version = "1.0.202", optional = true }
-http-body-util = { version = "0.1.1", optional = true }
 server_fn = { version = "0.6", optional = true }
-http-serde = "2.1.1"
+vercel_axum = { version = "1.1.4", optional = true }
+vercel_runtime = { version = "1.1.4", optional = true }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
@@ -77,18 +72,14 @@ ssr = [
     "dep:aws-types",
     "dep:aws-credential-types",
     "dep:aws-config",
-    "dep:lambda_http",
     "dep:reqwest",
     "dep:jsonwebtoken",
     "dep:openssl",
     "dep:dotenvy",
-    "dep:tower-service",
     "dep:serde_json",
-    "dep:lambda_runtime",
-    "dep:base64",
-    "dep:serde_derive",
-    "dep:http-body-util",
     "dep:server_fn",
+    "dep:vercel_runtime",
+    "dep:vercel_axum",
 ]
 
 # Defines a size-optimized profile for the WASM bundle in release mode

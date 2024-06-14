@@ -38,10 +38,10 @@ async fn main() {
 
     if std::env::var("LOCAL_DEV").is_err() {
         let app = tower::ServiceBuilder::new()
-            .layer(pipedream::vercel_axum::VercelLayer)
+            .layer(vercel_axum::VercelLayer)
             .service(app);
 
-        lambda_runtime::run(app).await.unwrap();
+        vercel_runtime::run_service(app).await.unwrap();
     } else {
         let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
         log::info!("listening on http://{}", &addr);

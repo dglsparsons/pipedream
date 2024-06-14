@@ -10,8 +10,6 @@ pub mod fileserv;
 #[cfg(feature = "ssr")]
 pub(crate) mod github;
 mod pages;
-#[cfg(feature = "ssr")]
-pub mod vercel_axum;
 pub mod workflow;
 
 cfg_if! { if #[cfg(feature = "hydrate")] {
